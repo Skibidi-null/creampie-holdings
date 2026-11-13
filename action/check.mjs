@@ -218,7 +218,7 @@ for (const [id, dev] of Object.entries(state.devices)) {
     try { await webpush.sendNotification(dev.sub, JSON.stringify(msg), { TTL: 3600, urgency: 'high' }); log('push', id, msg.tag); }
     catch (e) {
       log('push failed', id, e.statusCode, e.body);
-      if (e.statusCode === 404 || e.statusCode === 410) { delete state.devices[id]; break; }
+      if ([400, 403, 404, 410].includes(e.statusCode)) { delete state.devices[id]; break; }
     }
   }
   // forget devices silent for 60 days
