@@ -1,5 +1,5 @@
 // Creampie Holdings service worker: offline app shell + push alerts (iPhone/desktop).
-const V = '20261113142317';
+const V = '20261113143251';
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png', 'icons/badge.png',
   'fonts/orbitron.woff2', 'fonts/grotesk.woff2', 'fonts/grotesk-ext.woff2', 'fonts/mono.woff2', 'fonts/mono-ext.woff2'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -7,7 +7,7 @@ self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) =
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  if (u.pathname.endsWith('news.json')) { e.respondWith(fetch(e.request).catch(() => caches.match(e.request, { ignoreSearch: true }))); return; }
+  if (u.pathname.endsWith('news.json')) { e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(V).then((c) => c.put('news.json', cp)); } return r; }).catch(() => caches.match('news.json').then((h) => h || new Response('{"items":[]}', { headers: { 'Content-Type': 'application/json' } })))); return; }
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request).then((r) => {
     if (r.ok && u.pathname.match(/\.(js|css|png|woff2|json|webmanifest)$/)) { const cp = r.clone(); caches.open(V).then((c) => c.put(e.request, cp)); }
     return r;

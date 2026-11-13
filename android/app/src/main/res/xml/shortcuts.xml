@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="add" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_add" android:shortcutLongLabel="@string/sc_add">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.creampie.holdings" android:targetClass="com.creampie.holdings.MainActivity">
+            <extra android:name="open" android:value="add" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="gold" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_gold" android:shortcutLongLabel="@string/sc_gold">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.creampie.holdings" android:targetClass="com.creampie.holdings.MainActivity">
+            <extra android:name="open" android:value="gold" />
+        </intent>
+    </shortcut>
+</shortcuts>
