@@ -1,0 +1,53 @@
+name: Gold watch & alerts
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: watch
+  cancel-in-progress: false
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore alert state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: alert-state-${{ github.run_id }}
+          restore-keys: alert-state-
+      - run: npm ci --omit=dev --no-audit --no-fund
+        working-directory: action
+      - name: Check gold, news & send alerts
+        working-directory: action
+        env:
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          CFG_PRIVATE: ${{ secrets.CFG_PRIVATE }}
+          TOPIC: ${{ secrets.TOPIC }}
+          STATE_FILE: ../state/state.json
+          NEWS_FILE: ../docs/news.json
+        run: node check.mjs
+      - name: Save alert state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: alert-state-${{ github.run_id }}
+      - name: Publish news
+        run: |
+          if ! git diff --quiet -- docs/news.json; then
+            git config user.name "gold-watch-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/news.json
+            git commit -m "news update" -q
+            git pull --rebase -q || true
+            git push -q
+          fi

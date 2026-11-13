@@ -1,0 +1,9 @@
+.secrets.json
+node_modules/
+android/keystore/
+android/keystore.properties
+android/local.properties
+android/build/
+android/app/build/
+android/.gradle/
+*.apk
