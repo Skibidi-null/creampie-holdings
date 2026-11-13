@@ -11,7 +11,7 @@ const webpush = createRequire(import.meta.url)('web-push');
 const { VAPID_PUBLIC, VAPID_PRIVATE, CFG_PRIVATE, TOPIC } = process.env;
 const STATE = process.env.STATE_FILE || 'state/state.json';
 const NEWS = process.env.NEWS_FILE || 'docs/news.json';
-const APP_URL = 'https://mie7al-jpg.github.io/creampie-holdings/';
+const APP_URL = 'https://skibidi-null.github.io/creampie-holdings/';
 const OZ = 31.1034768;
 const now = Date.now();
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);

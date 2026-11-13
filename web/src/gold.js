@@ -265,7 +265,7 @@ export async function silverPerGram() {
 }
 
 // ---------- news (written hourly by the GitHub job into news.json next to the app) ----------
-export const NEWS_URL = 'https://mie7al-jpg.github.io/creampie-holdings/news.json';
+export const NEWS_URL = 'https://skibidi-null.github.io/creampie-holdings/news.json';
 export async function fetchNews() {
   const urls = location.hostname.endsWith('github.io') ? ['news.json'] : [NEWS_URL, 'news.json'];
   for (const u of urls) {

@@ -1,5 +1,5 @@
 // Creampie Holdings service worker: offline app shell + push alerts (iPhone/desktop).
-const V = '20261113141841';
+const V = '20261113142317';
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png', 'icons/badge.png',
   'fonts/orbitron.woff2', 'fonts/grotesk.woff2', 'fonts/grotesk-ext.woff2', 'fonts/mono.woff2', 'fonts/mono-ext.woff2'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
