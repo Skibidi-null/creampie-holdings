@@ -8,7 +8,7 @@ export const html = htm.bind(h);
 
 // ---------- toast ----------
 const toastSubs = new Set();
-export function toast(text, icon = '💋', ms = 3200) { toastSubs.forEach((f) => f({ text, icon, id: Math.random(), ms })); }
+export function toast(text, icon = '✓', ms = 3200) { toastSubs.forEach((f) => f({ text, icon, id: Math.random(), ms })); }
 export function Toaster() {
   const [t, setT] = useState(null);
   useEffect(() => {
@@ -36,16 +36,74 @@ export function Back({ title, hint, onBack, right }) {
 }
 
 export function Sheet({ title, onClose, children }) {
+  const ref = useRef();
+  const topRef = useRef();
+  const close = () => { if (history.state && history.state.sheet) history.back(); else onClose(); };
   useEffect(() => {
     const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
     const onPop = () => onClose();
     history.pushState({ sheet: 1 }, '');
     window.addEventListener('popstate', onPop);
-    return () => { document.body.style.overflow = prev; window.removeEventListener('popstate', onPop); };
+    // Swipe down to close (iPhone / Android touch). Works from the handle at any time,
+    // and from the content when it is scrolled to the top.
+    const el = ref.current;
+    let y0 = null, x0 = 0, dy = 0, t0 = 0, dragging = false, fromTop = false;
+    const start = (e) => {
+      if (e.touches.length !== 1) { y0 = null; return; }
+      fromTop = topRef.current && topRef.current.contains(e.target);
+      if (!fromTop && el.scrollTop > 0) { y0 = null; return; }
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; t0 = Date.now(); dragging = false;
+    };
+    const move = (e) => {
+      if (y0 == null) return;
+      const d = e.touches[0].clientY - y0;
+      if (!dragging) {
+        if (!fromTop && Math.abs(e.touches[0].clientX - x0) > Math.abs(d)) { y0 = null; return; }
+        if (d > 6 && (fromTop || el.scrollTop <= 0)) {
+          dragging = true;
+          const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
+        } else if (d < -4) { y0 = null; return; } else return;
+      }
+      if (e.cancelable) e.preventDefault();
+      dy = Math.max(0, d);
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${dy}px)`;
+    };
+    const end = () => {
+      if (y0 == null) return;
+      y0 = null;
+      if (!dragging) return;
+      dragging = false;
+      const speed = dy / Math.max(1, Date.now() - t0);
+      if (dy > 100 || (dy > 30 && speed > 0.5)) {
+        el.style.transition = 'transform .18s ease-in';
+        el.style.transform = 'translateY(100%)';
+        setTimeout(close, 170);
+      } else {
+        el.style.transition = 'transform .2s ease-out';
+        el.style.transform = '';
+      }
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: false });
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+    return () => {
+      document.body.style.overflow = prev; window.removeEventListener('popstate', onPop);
+      el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end);
+    };
   }, []);
-  const close = () => { if (history.state && history.state.sheet) history.back(); else onClose(); };
-  return html`<div class="overlay" onClick=${(e) => e.target === e.currentTarget && close()}>
-    <div class="sheet"><div class="grab"></div>${title && html`<h3>${title}</h3>`}${typeof children === 'function' ? children(close) : children}</div>
+  // stop the page behind from scrolling when the dark area is dragged
+  const blockBg = (e) => { if (e.target === e.currentTarget && e.cancelable) e.preventDefault(); };
+  return html`<div class="overlay" onClick=${(e) => e.target === e.currentTarget && close()} onTouchMove=${blockBg}>
+    <div class="sheet" ref=${ref}>
+      <div class="sheet-top" ref=${topRef}>
+        <div class="grab"></div>
+        <div class="sheet-head">${title ? html`<h3>${title}</h3>` : ''}<button class="x" onClick=${close} aria-label="Close">✕</button></div>
+      </div>
+      ${typeof children === 'function' ? children(close) : children}
+    </div>
   </div>`;
 }
 
@@ -64,7 +122,7 @@ export function Seg({ options, value, onChange }) {
 }
 export const Switch = ({ on, onChange }) => html`<button class=${`switch ${on ? 'on' : ''}`} onClick=${() => onChange(!on)} aria-pressed=${on}></button>`;
 export const Bar = ({ v, cls = '' }) => html`<div class=${`bar ${cls}`}><i style=${{ width: `${clamp(v, 0, 1) * 100}%` }}></i></div>`;
-export const Empty = ({ e = '🍑', text }) => html`<div class="empty"><span class="e">${e}</span>${text}</div>`;
+export const Empty = ({ e = '📭', text }) => html`<div class="empty"><span class="e">${e}</span>${text}</div>`;
 
 export function SettingRow({ title, hint, children, onClick }) {
   return html`<div class="row" style="padding:10px 2px" onClick=${onClick}>
@@ -72,7 +130,7 @@ export function SettingRow({ title, hint, children, onClick }) {
 }
 
 // ---------- line chart with touch scrubbing ----------
-export function LineChart({ pts, color = '#ff2e88', height = 180, time = false, fmt = (v) => num(v), marks = true, refLine }) {
+export function LineChart({ pts, color = '#1f6b57', height = 180, time = false, fmt = (v) => num(v), marks = true, refLine }) {
   const [hover, setHover] = useState(null);
   const ref = useRef();
   const W = 340, H = height, P = 6;
@@ -92,7 +150,7 @@ export function LineChart({ pts, color = '#ff2e88', height = 180, time = false, 
     const d = ds.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
     return { d, area: `${d}L${X(x1)},${H}L${X(x0)},${H}Z`, X, Y, lo: pts[loI], hi: pts[hiI] };
   }, [pts, height, refLine]);
-  if (!geo) return html`<div class="empty" style=${{ height: H + 'px', display: 'grid', placeItems: 'center' }}>Loading the good stuff…</div>`;
+  if (!geo) return html`<div class="empty" style=${{ height: H + 'px', display: 'grid', placeItems: 'center' }}>Loading…</div>`;
   const id = 'g' + color.replace('#', '');
   const onMove = (e) => {
     const r = ref.current.getBoundingClientRect();
@@ -104,26 +162,25 @@ export function LineChart({ pts, color = '#ff2e88', height = 180, time = false, 
   const lbl = (t) => { const d = new Date(t); return time ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); };
   const last = pts[pts.length - 1];
   return html`<div>
-    <div class="chart-tip">${hover ? html`<span class="pink">${fmt(hover[1])}</span> · ${lbl(hover[0])}` : html`<span class="mute">Touch the chart to explore</span>`}</div>
+    <div class="chart-tip">${hover ? html`<b>${fmt(hover[1])}</b> · ${lbl(hover[0])}` : html`<span class="mute">Touch the chart to explore</span>`}</div>
     <svg ref=${ref} class="chart" viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" style=${{ height: H + 'px' }}
       onTouchStart=${onMove} onTouchMove=${onMove} onMouseMove=${onMove} onTouchEnd=${() => setHover(null)} onMouseLeave=${() => setHover(null)}>
       <defs>
-        <linearGradient id=${id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${color} stop-opacity=".45"/><stop offset="1" stop-color=${color} stop-opacity="0"/></linearGradient>
-        <filter id=${id + 'f'}><feGaussianBlur stdDeviation="2.5"/></filter>
+        <linearGradient id=${id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${color} stop-opacity=".18"/><stop offset="1" stop-color=${color} stop-opacity="0"/></linearGradient>
+        
       </defs>
-      ${[0.25, 0.5, 0.75].map((f) => html`<line x1="0" x2=${W} y1=${H * f} y2=${H * f} stroke="rgba(255,255,255,.05)" />`)}
-      ${refLine && html`<line x1="0" x2=${W} y1=${geo.Y(refLine)} y2=${geo.Y(refLine)} stroke="#38e8ff" stroke-dasharray="4 4" stroke-width="1" opacity=".7" vector-effect="non-scaling-stroke"/>`}
+      ${[0.25, 0.5, 0.75].map((f) => html`<line x1="0" x2=${W} y1=${H * f} y2=${H * f} stroke="rgba(128,128,128,.15)" />`)}
+      ${refLine && html`<line x1="0" x2=${W} y1=${geo.Y(refLine)} y2=${geo.Y(refLine)} stroke="#2f6fa3" stroke-dasharray="4 4" stroke-width="1" opacity=".7" vector-effect="non-scaling-stroke"/>`}
       <path d=${geo.area} fill=${`url(#${id})`} />
-      <path d=${geo.d} fill="none" stroke=${color} stroke-width="5" opacity=".45" filter=${`url(#${id + 'f'})`} vector-effect="non-scaling-stroke"/>
       <path d=${geo.d} fill="none" stroke=${color} stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
-      ${marks && html`<circle cx=${geo.X(geo.lo[0])} cy=${geo.Y(geo.lo[1])} r="4" fill="#2bffa3" /><circle cx=${geo.X(geo.hi[0])} cy=${geo.Y(geo.hi[1])} r="4" fill="#ff4d6d" />`}
-      <circle cx=${geo.X(last[0])} cy=${geo.Y(last[1])} r="4.5" fill="#fff"><animate attributeName="r" values="4;8;4" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;.4;1" dur="1.6s" repeatCount="indefinite"/></circle>
-      ${hover && html`<line x1=${geo.X(hover[0])} x2=${geo.X(hover[0])} y1="0" y2=${H} stroke="#fff" stroke-width="1" opacity=".5" vector-effect="non-scaling-stroke"/><circle cx=${geo.X(hover[0])} cy=${geo.Y(hover[1])} r="5" fill="#fff" />`}
+      ${marks && html`<circle cx=${geo.X(geo.lo[0])} cy=${geo.Y(geo.lo[1])} r="4" fill="#1e8a55" /><circle cx=${geo.X(geo.hi[0])} cy=${geo.Y(geo.hi[1])} r="4" fill="#c2392f" />`}
+      <circle cx=${geo.X(last[0])} cy=${geo.Y(last[1])} r="4" fill=${color} />
+      ${hover && html`<line x1=${geo.X(hover[0])} x2=${geo.X(hover[0])} y1="0" y2=${H} stroke="currentColor" stroke-width="1" opacity=".4" vector-effect="non-scaling-stroke"/><circle cx=${geo.X(hover[0])} cy=${geo.Y(hover[1])} r="5" fill=${color} />`}
     </svg>
   </div>`;
 }
 
-export const PALETTE = ['#ff2e88', '#a35cff', '#38e8ff', '#ffc94d', '#2bffa3', '#ff7a45', '#ff7ab8', '#6c8cff', '#e0ff4d', '#b0b0c8'];
+export const PALETTE = ['#1f6b57', '#2f6fa3', '#c8963e', '#b5523b', '#6b5b95', '#4f8a3c', '#a0596e', '#3e8e9e', '#8a7a52', '#9a9a92'];
 
 export function Donut({ data, size = 150, center }) {
   const total = data.reduce((s, d) => s + d.v, 0);
@@ -131,15 +188,15 @@ export function Donut({ data, size = 150, center }) {
   const R = 56, C = 2 * Math.PI * R;
   let off = 0;
   return html`<svg viewBox="0 0 150 150" width=${size} height=${size} style="flex:none">
-    <circle cx="75" cy="75" r=${R} fill="none" stroke="rgba(255,255,255,.06)" stroke-width="16"/>
+    <circle cx="75" cy="75" r=${R} fill="none" stroke="rgba(128,128,128,.15)" stroke-width="16"/>
     ${data.map((d, i) => {
       const len = (d.v / total) * C;
       const el = html`<circle cx="75" cy="75" r=${R} fill="none" stroke=${d.color || PALETTE[i % PALETTE.length]} stroke-width="16"
-        stroke-dasharray=${`${Math.max(0, len - 2)} ${C}`} stroke-dashoffset=${-off} transform="rotate(-90 75 75)" style="filter:drop-shadow(0 0 4px rgba(255,46,136,.5))"/>`;
+        stroke-dasharray=${`${Math.max(0, len - 2)} ${C}`} stroke-dashoffset=${-off} transform="rotate(-90 75 75)"/>`;
       off += len; return el;
     })}
-    ${center && html`<text x="75" y="72" text-anchor="middle" fill="#b49bb5" font-size="9" font-family="Orbitron" letter-spacing="1.5">${center[0]}</text>
-    <text x="75" y="90" text-anchor="middle" fill="#fff" font-size="15" font-weight="800" font-family="Mono">${center[1]}</text>`}
+    ${center && html`<text x="75" y="72" text-anchor="middle" fill="currentColor" opacity=".6" font-size="10">${center[0]}</text>
+    <text x="75" y="90" text-anchor="middle" fill="currentColor" font-size="15" font-weight="700">${center[1]}</text>`}
   </svg>`;
 }
 
@@ -154,9 +211,9 @@ export function Bars({ rows, height = 140 }) {
       const x = i * slot + slot / 2;
       const ha = (r.a / max) * H, hb = (r.b / max) * H;
       return html`<g>
-        <rect x=${x - bw - 1} y=${H - ha} width=${bw} height=${ha} rx="3" fill="#2bffa3" opacity=".85"/>
-        <rect x=${x + 1} y=${H - hb} width=${bw} height=${hb} rx="3" fill="#ff2e88" opacity=".9"/>
-        <text x=${x} y=${H + 13} text-anchor="middle" font-size="9" fill="#7c6680" font-family="Orbitron">${r.label}</text>
+        <rect x=${x - bw - 1} y=${H - ha} width=${bw} height=${ha} rx="3" fill="#1e8a55" opacity=".85"/>
+        <rect x=${x + 1} y=${H - hb} width=${bw} height=${hb} rx="3" fill="#b5523b" opacity=".85"/>
+        <text x=${x} y=${H + 13} text-anchor="middle" font-size="10" fill="#8d8c85">${r.label}</text>
       </g>`;
     })}
   </svg>`;
@@ -167,12 +224,12 @@ export function SimpleBars({ rows, height = 120, fmt = (v) => v.toFixed(1) }) {
   const max = Math.max(...rows.map((r) => Math.abs(r.v)), 0.01);
   const W = 340, H = height, mid = H / 2, slot = W / rows.length, bw = slot * 0.6;
   return html`<svg viewBox=${`0 0 ${W} ${H + 16}`} class="chart" style=${{ height: H + 16 + 'px' }}>
-    <line x1="0" x2=${W} y1=${mid} y2=${mid} stroke="rgba(255,255,255,.15)"/>
+    <line x1="0" x2=${W} y1=${mid} y2=${mid} stroke="rgba(128,128,128,.3)"/>
     ${rows.map((r, i) => {
       const hh = (Math.abs(r.v) / max) * (mid - 4);
       const x = i * slot + (slot - bw) / 2;
-      return html`<g><rect x=${x} y=${r.v >= 0 ? mid - hh : mid} width=${bw} height=${hh} rx="3" fill=${r.v < 0 ? '#2bffa3' : '#ff4d6d'} opacity=${r.hl ? 1 : 0.7}/>
-        <text x=${x + bw / 2} y=${H + 12} text-anchor="middle" font-size="9" fill=${r.hl ? '#fff' : '#7c6680'} font-family="Orbitron">${r.label}</text></g>`;
+      return html`<g><rect x=${x} y=${r.v >= 0 ? mid - hh : mid} width=${bw} height=${hh} rx="3" fill=${r.v < 0 ? '#1e8a55' : '#c2392f'} opacity=${r.hl ? 1 : 0.7}/>
+        <text x=${x + bw / 2} y=${H + 12} text-anchor="middle" font-size="10" fill="#8d8c85" font-weight=${r.hl ? 700 : 400}>${r.label}</text></g>`;
     })}
   </svg>`;
 }

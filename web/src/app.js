@@ -51,7 +51,7 @@ function Lock({ onOpen }) {
   }, []);
   return html`<div class="lock">
     <img class="logo" src="icons/icon-192.png" alt="" />
-    <div class="xxx" style="font-size:18px">${T.members}</div>
+    <div class="h-big">${T.app}</div>
     <div class="dim">${bad ? T.pinWrong : T.pinAsk}</div>
     <div class=${`dots ${bad ? 'shake' : ''}`}>${[0, 1, 2, 3, 4, 5].map((i) => html`<i class=${i < pin.length ? 'on' : ''} style=${{ opacity: i < 4 || i < pin.length ? 1 : 0.3 }}></i>`)}</div>
     <div class="pad">
@@ -67,11 +67,11 @@ function Dock({ tab, onAdd }) {
   const go = (t) => { vibrate(6); if (route().name !== t) location.replace('#/' + t); };
   const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i">${i}</span>${label}</button>`;
   return html`<nav class="dock">
-    ${B('home', '💋', T.nHome)}
-    ${B('activity', '🧾', 'Laundry')}
+    ${B('home', '🏠', T.nHome)}
+    ${B('activity', '🧾', T.nActivity)}
     <button class="plus" onClick=${onAdd} aria-label="Add">＋</button>
-    ${B('gold', '🪙', 'Gold')}
-    ${B('wealth', '👑', 'Stash')}
+    ${B('gold', '🪙', T.nGold)}
+    ${B('wealth', '📊', T.nWealth)}
   </nav>`;
 }
 
@@ -87,7 +87,7 @@ function App() {
     refreshRates().then(() => startLive());
     loadHistory().catch(() => {});
     syncConfig();
-    const onAlert = (a) => { toast(a.text, a.kind === 'below' ? '📉' : '🔥', 6000); localNotify('🪙 Gold went down on you', a.text); };
+    const onAlert = (a) => { toast(a.text, '📉', 6000); localNotify('Gold price alert', a.text); };
     alertBus.add(onAlert);
     let lastHidden = 0;
     const vis = () => {

@@ -29,7 +29,7 @@ object Notifier {
         val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_notif)
             .setLargeIcon(BitmapFactory.decodeResource(ctx.resources, R.drawable.notif_large))
-            .setColor(0xFFFF2E88.toInt())
+            .setColor(0xFF1F6B57.toInt())
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

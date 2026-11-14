@@ -40,7 +40,7 @@ export const parseNum = (v) => {
 const nf = {};
 const fmtr = (d) => (nf[d] ||= new Intl.NumberFormat('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d }));
 export const num = (v, d = 2) => fmtr(d).format(Number.isFinite(v) ? v : 0).replace(/ /g, ' ');
-export const SYM = { PLN: 'zł', EUR: '€', USD: '$', AED: 'AED', GBP: '£' };
+export const SYM = { PLN: 'zł', EUR: '€', USD: '$', AED: 'AED', GBP: '£', INR: '₹' };
 export const money = (v, cur = 'PLN', d = 2) => {
   const s = num(Math.abs(v), d);
   const sign = v < 0 ? '−' : '';

@@ -28,9 +28,9 @@ export function Budget() {
   const limits = Object.entries(s.budget.cats).filter(([, v]) => v > 0);
   return html`<div class="screen">
     <${Back} title=${T.budget} hint="Monthly limit & category limits" onBack=${back} />
-    <div class="card neon">
+    <div class="card">
       <${Field} label="My monthly spending limit (zł)">
-        <div class="row"><${NumInput} value=${monthly} onInput=${setMonthly} placeholder="e.g. 4000" /><button class="btn primary" onClick=${() => { patch('budget', { monthly: parseNum(monthly) || 0 }); toast('Limit set. Behave 😈', '⛓️'); }}>Set</button></div>
+        <div class="row"><${NumInput} value=${monthly} onInput=${setMonthly} placeholder="e.g. 4000" /><button class="btn primary" onClick=${() => { patch('budget', { monthly: parseNum(monthly) || 0 }); toast('Monthly limit saved'); }}>Set</button></div>
       <//>
       ${dl && html`<div class="kv" style="margin-top:6px">
         <span>Spent this month</span><${Money} v=${ms.spend} />
@@ -42,7 +42,7 @@ export function Budget() {
     </div>
     <div class="sect"><span class="h-title">This month by category</span></div>
     <div class="card"><${CategoryBreakdown} s=${s} ms=${ms} /></div>
-    <div class="sect"><span class="h-title">Category limits 🔥</span><button class="more" onClick=${() => setEditCat('pick')}>＋ Add limit</button></div>
+    <div class="sect"><span class="h-title">Category limits</span><button class="more" onClick=${() => setEditCat('pick')}>＋ Add limit</button></div>
     <div class="card" style="padding:6px 14px">
       ${limits.length ? limits.map(([id, lim]) => {
         const spent = ms.byCat[id] || 0; const r = spent / lim; const c = catOf(s, id);
@@ -78,7 +78,7 @@ export function Bills() {
   const monthly = s.recurring.filter((r) => !r.paused).reduce((a, r) => a + r.amt, 0);
   return html`<div class="screen">
     <${Back} title=${T.bills} hint="Rent, phone, subscriptions: added automatically" onBack=${back} right=${html`<button class="iconbtn" onClick=${() => setEdit({})}>＋</button>`} />
-    <div class="card neon hero"><div class="label">Fixed costs every month</div><div class="big glow-pink"><${Money} v=${monthly} /></div><div class="sub">${s.recurring.length} repeating bill${s.recurring.length === 1 ? '' : 's'}</div></div>
+    <div class="card hero"><div class="label">Fixed costs every month</div><div class="big"><${Money} v=${monthly} /></div><div class="sub">${s.recurring.length} repeating bill${s.recurring.length === 1 ? '' : 's'}</div></div>
     <div class="sect"><span class="h-title">Coming up 📅</span></div>
     <div class="card" style="padding:4px 12px">
       ${up.length ? up.map((b) => { const d = daysBetween(today(), b.date); return html`<div class="item">
@@ -165,7 +165,7 @@ export function Summary({ ym: ym0 }) {
   const top = Object.entries(ms.byCat).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const changes = Object.keys({ ...ms.byCat, ...prev.byCat }).map((id) => ({ id, now: ms.byCat[id] || 0, before: prev.byCat[id] || 0 }))
     .filter((x) => x.before > 0 || x.now > 0).map((x) => ({ ...x, d: x.now - x.before })).sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 5);
-  const verdict = !ms.spend ? 'Nothing happened. Saving yourself? 😇' : ms.net > 0 && rate > 20 ? 'Disciplined AND rich. Very hot 🔥' : ms.net > 0 ? 'You finished on top 😏' : 'You went all the way and then some. Pull out next month 💦';
+  const verdict = !ms.spend ? 'No spending recorded this month.' : ms.net > 0 && rate > 20 ? `Great month. You kept ${num(rate, 0)}% of your income.` : ms.net > 0 ? 'You spent less than you earned.' : 'You spent more than you earned this month.';
   return html`<div class="screen">
     <${Back} title=${T.summary} hint="Month summary" onBack=${back} />
     <div class="row between" style="margin:0 2px 12px">
@@ -173,20 +173,20 @@ export function Summary({ ym: ym0 }) {
       <div class="h-big" style="font-size:16px">${monthName(ym, true)}</div>
       <button class="iconbtn" onClick=${() => ym < thisYm() && setYm(nextYm(ym))} style=${{ opacity: ym >= thisYm() ? 0.3 : 1 }}>›</button>
     </div>
-    <div class="card neon"><div class="h-big" style="font-size:17px;line-height:1.3">${verdict}</div></div>
+    <div class="card"><div class="h-big" style="font-size:17px;line-height:1.3">${verdict}</div></div>
     <div class="stat3">
-      <div><div class="l">Blown</div><div class="v"><${Money} v=${ms.spend} d=${0} /></div><div class="d">${prev.spend ? pct(((ms.spend - prev.spend) / prev.spend) * 100, 0) + ' vs last' : ''}</div></div>
+      <div><div class="l">Spent</div><div class="v"><${Money} v=${ms.spend} d=${0} /></div><div class="d">${prev.spend ? pct(((ms.spend - prev.spend) / prev.spend) * 100, 0) + ' vs last' : ''}</div></div>
       <div><div class="l">Came in</div><div class="v up"><${Money} v=${ms.income} d=${0} /></div></div>
       <div><div class="l">Saved</div><div class="v cyan"><${Money} v=${ms.saved} d=${0} /></div><div class="d">${rate != null ? `${num(rate, 0)}% kept` : ''}</div></div>
     </div>
     <div class="card" style="margin-top:12px"><div class="kv">
       <span>Daily average</span><${Money} v=${ms.spend / days} />
-      <span>No-spend days 😇</span><span>${noSpend} / ${days}</span>
-      <span>Biggest splurge</span><span>${biggest ? html`<${Money} v=${txnPln(s, biggest)} /> <span class="hint">${catOf(s, biggest.cat).icon}</span>` : '—'}</span>
+      <span>No-spend days</span><span>${noSpend} / ${days}</span>
+      <span>Biggest expense</span><span>${biggest ? html`<${Money} v=${txnPln(s, biggest)} /> <span class="hint">${catOf(s, biggest.cat).icon}</span>` : '—'}</span>
       <span>On the card</span><${Money} v=${ms.card} />
     </div></div>
-    ${top.length > 0 && html`<div class="sect"><span class="h-title">Top 3 guilty pleasures</span></div>
-    <div class="card">${top.map(([id, v], i) => html`<div class="row" style="padding:6px 0"><span class="xxx" style="width:26px">${i + 1}</span><span class="grow">${catOf(s, id).icon} ${catOf(s, id).name}</span><${Money} v=${v} /></div>`)}</div>`}
+    ${top.length > 0 && html`<div class="sect"><span class="h-title">Top 3 categories</span></div>
+    <div class="card">${top.map(([id, v], i) => html`<div class="row" style="padding:6px 0"><span class="mute" style="width:22px;font-weight:700">${i + 1}</span><span class="grow">${catOf(s, id).icon} ${catOf(s, id).name}</span><${Money} v=${v} /></div>`)}</div>`}
     ${changes.length > 0 && prev.spend > 0 && html`<div class="sect"><span class="h-title">vs ${monthName(prevYm(ym))}</span></div>
     <div class="card">${changes.map((c) => html`<div class="row" style="padding:6px 0"><span class="grow">${catOf(s, c.id).icon} ${catOf(s, c.id).name}</span>
       <span class=${`mono ${c.d > 0 ? 'down' : 'up'}`} style="font-size:13px">${c.d > 0 ? '▲' : '▼'} ${s.settings.privacy ? '••' : num(Math.abs(c.d), 0)} zł${c.before ? ` (${pct((c.d / c.before) * 100, 0)})` : ' (new)'}</span></div>`)}</div>`}

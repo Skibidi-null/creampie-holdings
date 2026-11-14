@@ -66,7 +66,7 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             val below = gold.optDouble("below", 0.0)
             if (below > 0) {
                 if (price <= below && !prefs.getBoolean("firedBelow", false)) {
-                    Notifier.send(ctx, Notifier.CH_GOLD, 101, "📉 Gold went down on you", String.format("Now %.2f zł/g, under your %.0f zł target. Time to get some? 😏", price, below), "gold")
+                    Notifier.send(ctx, Notifier.CH_GOLD, 101, "Gold price alert", String.format("Gold is now %.2f zł/g, below your %.0f zł target.", price, below), "gold")
                     ed.putBoolean("firedBelow", true)
                 }
                 if (price > below * 1.005) ed.putBoolean("firedBelow", false)
@@ -77,7 +77,7 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                 for (i in 0 until kept.length()) { val s = kept.getJSONArray(i); if (s.getLong(0) >= now - 24 * 3600_000L) { hi = maxOf(hi, s.getDouble(1)); first = minOf(first, s.getLong(0)) } }
                 val drop = if (hi > 0) (hi - price) / hi * 100 else 0.0
                 if (now - first > 3 * 3600_000L && drop >= dropPct && now - prefs.getLong("dropAt", 0) > 6 * 3600_000L) {
-                    Notifier.send(ctx, Notifier.CH_GOLD, 102, String.format("🔥 Gold dropped %.1f%% today", drop), String.format("%.2f zł/g, down from %.2f in the last 24h. Dip time? 🍆", price, hi), "gold")
+                    Notifier.send(ctx, Notifier.CH_GOLD, 102, String.format("🔥 Gold dropped %.1f%% today", drop), String.format("%.2f zł/g, down from %.2f in the last 24 hours.", price, hi), "gold")
                     ed.putLong("dropAt", now)
                 }
             }
@@ -118,14 +118,14 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             val key = "$due:$days"
             if (days in listOf(3, 1, 0) && prefs.getString("cardKey", "") != key) {
                 val name = card.optString("name", "Card")
-                Notifier.send(ctx, Notifier.CH_REMIND, 301, if (days == 0) "💳 $name bill due TODAY" else "💳 $name bill in $days day${if (days > 1) "s" else ""}", String.format("Pay %.2f zł to keep Plastic Daddy satisfied 💦", card.optDouble("owed")), "card")
+                Notifier.send(ctx, Notifier.CH_REMIND, 301, if (days == 0) "💳 $name bill due TODAY" else "💳 $name bill in $days day${if (days > 1) "s" else ""}", String.format("Amount to pay: %.2f zł", card.optDouble("owed")), "card")
                 ed.putString("cardKey", key)
             }
         }
 
         // ---- 9 pm reminder ----
         if (cfg.optBoolean("remind9pm") && local.hour == 21 && prefs.getString("night", "") != today) {
-            if (cfg.optString("lastEntry") != today) Notifier.send(ctx, Notifier.CH_REMIND, 401, "🌙 Did you log today's sins?", "Quick, add what you blew today before bed 😈", "add")
+            if (cfg.optString("lastEntry") != today) Notifier.send(ctx, Notifier.CH_REMIND, 401, "Daily reminder", "Add today's spending before you forget.", "add")
             ed.putString("night", today)
         }
 

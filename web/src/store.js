@@ -47,16 +47,16 @@ const blank = () => ({
     { id: 'cash', name: 'Cash', cur: 'PLN', kind: 'cash', opening: 0, icon: '💵' },
   ],
   txns: [],
-  card: { on: true, name: 'Credit card', limit: 0, opening: 0, dueDay: 0 },
+  card: { on: true, name: 'Credit card', limit: 0, opening: 0, dueDay: 0, target: 0 },
   friends: [],
   gold: { buys: [], below: null, dropPct: 2, alertsOn: true, newsOn: true, goalGrams: 0, sellSpread: 4 },
   budget: { monthly: 0, cats: {} },
   recurring: [],
   goals: [],
   cats: { exp: DEFAULT_EXP, inc: DEFAULT_INC },
-  zakat: { nisab: 'gold', countOwed: true, hawl: '' },
+  zakat: { nisab: 'gold', countOwed: true, hawl: '', other: 0, debts: 0 },
   settings: { privacy: false, pin: null, remind9pm: true, cardRemind: true, onboarded: false, alertsSetup: false },
-  rates: { PLN: 1, USD: 0, EUR: 0, AED: 0, GBP: 0, at: 0 },
+  rates: { PLN: 1, USD: 0, EUR: 0, AED: 0, GBP: 0, INR: 0, at: 0 },
 });
 
 function load() {
@@ -222,6 +222,36 @@ export function dailyLimit(s) {
   const daysLeft = dim - day + 1;
   const allowance = Math.max(0, (B - before) / daysLeft);
   return { allowance, todaySpent, left: allowance - todaySpent, monthLeft: B - before - todaySpent, daysLeft, budget: B };
+}
+
+// Credit card pace for a month: what was put on the card so far, the daily average,
+// and where that pace ends up by the last day of the month.
+// e.g. 1000 zł in the first 10 days → 100 zł/day → 3000 zł for a 30-day month.
+export function cardProjection(s, ym = thisYm()) {
+  const t = today();
+  const dim = daysInMonth(ym);
+  const isNow = ym === thisYm();
+  const day = isNow ? Number(t.slice(8)) : dim;
+  const days = [];
+  for (let i = 0; i < dim; i++) days.push(0);
+  let spent = 0;
+  for (const x of s.txns) {
+    if (x.from !== CARD || ymOf(x.date) !== ym || x.date > t) continue;
+    spent += x.amt;
+    days[Number(x.date.slice(8)) - 1] += x.amt;
+  }
+  const perDay = day ? spent / day : 0;
+  const daysLeft = dim - day;
+  const projected = spent + perDay * daysLeft;
+  const target = s.card.target || 0;
+  return {
+    ym, spent, day, dim, daysLeft, perDay, projected, days,
+    extra: perDay * daysLeft,
+    owedEnd: cardOwed(s) + perDay * daysLeft,
+    target,
+    overTarget: target ? projected - target : null,
+    safePerDay: target && daysLeft > 0 ? Math.max(0, (target - spent) / daysLeft) : null,
+  };
 }
 
 export function cashTotal(s) {

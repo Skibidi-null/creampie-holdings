@@ -181,12 +181,12 @@ for (const [id, dev] of Object.entries(state.devices)) {
   const g = c.gold || {};
   if (price && g.on) {
     if (g.below) {
-      if (price <= g.below && !f.below) { sends.push({ title: '📉 Gold went down on you', body: `Now ${price.toFixed(2)} zł/g, under your ${g.below} zł target. Time to get some? 😏`, url: APP_URL + '#/gold', tag: 'gold-below' }); f.below = true; }
+      if (price <= g.below && !f.below) { sends.push({ title: 'Gold price alert', body: `Gold is now ${price.toFixed(2)} zł/g, below your ${g.below} zł target.`, url: APP_URL + '#/gold', tag: 'gold-below' }); f.below = true; }
       if (price > g.below * 1.005) f.below = false;
     }
     if (g.dropPct && hi24 && coverage > 3 * 3600e3) {
       const drop = ((hi24 - price) / hi24) * 100;
-      if (drop >= g.dropPct && now - (f.dropAt || 0) > 6 * 3600e3) { sends.push({ title: `🔥 Gold dropped ${drop.toFixed(1)}% today`, body: `${price.toFixed(2)} zł/g, down from ${hi24.toFixed(2)} in the last 24h. Dip time? 🍆`, url: APP_URL + '#/gold', tag: 'gold-drop' }); f.dropAt = now; }
+      if (drop >= g.dropPct && now - (f.dropAt || 0) > 6 * 3600e3) { sends.push({ title: `🔥 Gold dropped ${drop.toFixed(1)}% today`, body: `${price.toFixed(2)} zł/g, down from ${hi24.toFixed(2)} in the last 24 hours.`, url: APP_URL + '#/gold', tag: 'gold-drop' }); f.dropAt = now; }
     }
   }
   if (g.news && news && news.items) {
@@ -206,12 +206,12 @@ for (const [id, dev] of Object.entries(state.devices)) {
     const { days, due } = daysUntilDay(L.date, card.dueDay);
     const key = `${due}:${days}`;
     if ([3, 1, 0].includes(days) && f.card !== key) {
-      sends.push({ title: days === 0 ? `💳 ${card.name} bill due TODAY` : `💳 ${card.name} bill in ${days} day${days > 1 ? 's' : ''}`, body: `Pay ${card.owed.toFixed(2)} zł to keep Plastic Daddy satisfied 💦`, url: APP_URL + '#/card', tag: 'card' });
+      sends.push({ title: days === 0 ? `💳 ${card.name} bill due TODAY` : `💳 ${card.name} bill in ${days} day${days > 1 ? 's' : ''}`, body: `Amount to pay: ${card.owed.toFixed(2)} zł`, url: APP_URL + '#/card', tag: 'card' });
       f.card = key;
     }
   }
   if (c.remind9pm && L.hour === 21 && f.night !== L.date) {
-    if (c.lastEntry !== L.date) sends.push({ title: '🌙 Did you log today\'s sins?', body: 'Quick, add what you blew today before bed 😈', url: APP_URL + '#/add', tag: 'night' });
+    if (c.lastEntry !== L.date) sends.push({ title: 'Daily reminder', body: 'Add today\'s spending before you forget.', url: APP_URL + '#/add', tag: 'night' });
     f.night = L.date;
   }
   for (const msg of sends) {

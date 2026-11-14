@@ -35,12 +35,12 @@ class Widget : AppWidgetProvider() {
             val v = RemoteViews(ctx.packageName, R.layout.widget)
             if (w != null && !w.isNull("left")) {
                 val left = w.optDouble("left")
-                v.setTextViewText(R.id.left_label, if (left >= 0) "Left to blow today" else "Over today by")
+                v.setTextViewText(R.id.left_label, if (left >= 0) "Left to spend today" else "Over today by")
                 v.setTextViewText(R.id.left, if (priv) "••••" else zl(kotlin.math.abs(left)))
-                v.setTextColor(R.id.left, if (left >= 0) 0xFFFFFFFF.toInt() else 0xFFFF4D6D.toInt())
-                v.setTextViewText(R.id.today, if (priv) "" else "Blown today: ${zl(w.optDouble("today", 0.0))}")
+                v.setTextColor(R.id.left, if (left >= 0) 0xFF1D1D1B.toInt() else 0xFFC2392F.toInt())
+                v.setTextViewText(R.id.today, if (priv) "" else "Spent today: ${zl(w.optDouble("today", 0.0))}")
             } else {
-                v.setTextViewText(R.id.left_label, "Blown this month")
+                v.setTextViewText(R.id.left_label, "Spent this month")
                 v.setTextViewText(R.id.left, if (priv || w == null) "••••" else zl(w.optDouble("month", 0.0)))
                 v.setTextViewText(R.id.today, "Set a monthly limit for a daily one")
             }
@@ -48,7 +48,7 @@ class Widget : AppWidgetProvider() {
             if (gold > 0 && ref > 0) {
                 val pct = (gold - ref) / ref * 100
                 v.setTextViewText(R.id.goldchg, String.format(Locale.US, "%s %.2f%%", if (pct >= 0) "▲" else "▼", kotlin.math.abs(pct)))
-                v.setTextColor(R.id.goldchg, if (pct >= 0) 0xFF2BFFA3.toInt() else 0xFFFF4D6D.toInt())
+                v.setTextColor(R.id.goldchg, if (pct >= 0) 0xFF1E8A55.toInt() else 0xFFC2392F.toInt())
             }
             v.setOnClickPendingIntent(R.id.root, open(ctx, "home", 9001))
             v.setOnClickPendingIntent(R.id.goldbox, open(ctx, "gold", 9002))

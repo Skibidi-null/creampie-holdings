@@ -4,20 +4,20 @@
     android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="14dp">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
         <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-            android:text="CREAMPIE · XXX" android:textColor="#FF7AB8" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.15" />
+            android:text="Creampie Holdings" android:textColor="#1F6B57" android:textSize="12sp" android:textStyle="bold" />
         <TextView android:id="@+id/add" android:layout_width="40dp" android:layout_height="32dp" android:gravity="center"
             android:background="@drawable/widget_btn" android:text="+" android:textColor="#FFFFFF" android:textSize="20sp" />
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:gravity="center_vertical">
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-            <TextView android:id="@+id/left_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Left to blow today" android:textColor="#B49BB5" android:textSize="11sp" />
-            <TextView android:id="@+id/left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="…" android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold" android:fontFamily="monospace" />
-            <TextView android:id="@+id/today" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="#7C6680" android:textSize="11sp" />
+            <TextView android:id="@+id/left_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Left to spend today" android:textColor="#5F5F5A" android:textSize="11sp" />
+            <TextView android:id="@+id/left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="…" android:textColor="#1D1D1B" android:textSize="22sp" android:textStyle="bold" android:fontFamily="monospace" />
+            <TextView android:id="@+id/today" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="#8D8C85" android:textSize="11sp" />
         </LinearLayout>
         <LinearLayout android:id="@+id/goldbox" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🪙 Gold zł/g" android:textColor="#B49BB5" android:textSize="11sp" />
-            <TextView android:id="@+id/gold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="…" android:textColor="#FFC94D" android:textSize="22sp" android:textStyle="bold" android:fontFamily="monospace" />
-            <TextView android:id="@+id/goldchg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="#7C6680" android:textSize="11sp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🪙 Gold zł/g" android:textColor="#5F5F5A" android:textSize="11sp" />
+            <TextView android:id="@+id/gold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="…" android:textColor="#A87414" android:textSize="22sp" android:textStyle="bold" android:fontFamily="monospace" />
+            <TextView android:id="@+id/goldchg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="#8D8C85" android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'preact/hooks';
 import { html, Sheet, Field, NumInput, Seg, toast, valid } from './ui.js';
-import { get, set, useStore, addTxn, updateTxn, deleteTxn, CARD, curOf, cardOwed, monthStats, catOf, friendBalances, dailyLimit } from './store.js';
+import { get, set, useStore, addTxn, updateTxn, deleteTxn, CARD, curOf, cardOwed, cardProjection, monthStats, catOf, friendBalances, dailyLimit } from './store.js';
 import { T } from './copy.js';
 import { parseNum, today, uid, money, thisYm, vibrate } from './util.js';
 
-const MODES = [['exp', '💸 Spend'], ['inc', '💦 Income'], ['xfer', '🔀 Move'], ['split', '🍕 Split'], ['friend', '🤝 Favour']];
+const MODES = [['exp', 'Expense'], ['inc', 'Income'], ['xfer', 'Move'], ['split', 'Split'], ['friend', 'Lend']];
 
 export function AddSheet({ onClose, edit, mode: initialMode = 'exp', preset = {} }) {
   const s = useStore();
@@ -44,7 +44,7 @@ function DateNote({ date, setDate, note, setNote }) {
 
 function Footer({ edit, onSave, ok, label = 'Save it' }) {
   return html`<div class="btns" style="margin-top:6px">
-    ${edit && html`<button class="btn danger" onClick=${() => { if (confirm('Delete this entry?')) { deleteTxn(edit.id); toast('Gone. Like it never happened 🤫', '🗑️'); onSave(true); } }}>Delete</button>`}
+    ${edit && html`<button class="btn danger" onClick=${() => { if (confirm('Delete this entry?')) { deleteTxn(edit.id); toast('Deleted', '🗑️'); onSave(true); } }}>Delete</button>`}
     <button class="btn primary grow" disabled=${!ok} style=${{ opacity: ok ? 1 : 0.4 }} onClick=${() => ok && onSave()}>${label}</button>
   </div>`;
 }
@@ -55,19 +55,23 @@ function warnAfterSpend(cat, from) {
   const s = get();
   if (from === CARD && s.card.limit) {
     const used = cardOwed(s) / s.card.limit;
-    if (used >= 1) return toast(`Plastic Daddy is maxed out (${Math.round(used * 100)}%) 🥵`, '💳', 5000);
+    if (used >= 1) return toast(`Credit card limit reached (${Math.round(used * 100)}% used)`, '💳', 5000);
     if (used >= 0.8) return toast(T.cardWarn80, '💳', 5000);
+  }
+  if (from === CARD && s.card.target) {
+    const p = cardProjection(s);
+    if (p.projected > p.target) return toast(`At this pace your card spending will reach ${money(p.projected, 'PLN', 0)} this month (target ${money(p.target, 'PLN', 0)})`, '💳', 6000);
   }
   const lim = s.budget.cats[cat];
   if (lim) {
     const spent = monthStats(s, thisYm()).byCat[cat] || 0;
     const name = catOf(s, cat).name;
     if (spent >= lim) return toast(T.catOver(name), '🚨', 5000);
-    if (spent >= lim * 0.8) return toast(T.catWarn(name), '🔥', 5000);
+    if (spent >= lim * 0.8) return toast(T.catWarn(name), '⚠️', 5000);
   }
   const dl = dailyLimit(s);
-  if (dl && dl.left < 0) return toast(`${T.todayOver} ${money(-dl.left)}`, '😳', 4500);
-  toast(['Logged. Naughty 😏', 'Spent and recorded 💸', 'Got it, big spender 😈', 'In it goes 💋'][Math.floor(Math.random() * 4)], '✅');
+  if (dl && dl.left < 0) return toast(`${T.todayOver} ${money(-dl.left)}`, '⚠️', 4500);
+  toast('Expense saved', '✓');
 }
 
 function ExpenseForm({ s, edit, preset, done }) {
@@ -85,7 +89,7 @@ function ExpenseForm({ s, edit, preset, done }) {
   const ok = valid(amt) && cat && from !== undefined;
   const save = () => {
     const data = { t: 'exp', amt: parseNum(amt), cat, from, date, note };
-    if (edit) { updateTxn(edit.id, data); toast('Updated 💋', '✏️'); } else { addTxn(data); warnAfterSpend(cat, from); }
+    if (edit) { updateTxn(edit.id, data); toast('Updated', '✓'); } else { addTxn(data); warnAfterSpend(cat, from); }
     done();
   };
   return html`
@@ -108,7 +112,7 @@ function IncomeForm({ s, edit, done }) {
   const save = () => {
     const data = { t: 'inc', amt: parseNum(amt), cat, to, date, note };
     if (edit) updateTxn(edit.id, data); else addTxn(data);
-    toast(edit ? 'Updated 💋' : 'Money shot received 💦', '🤑');
+    toast(edit ? 'Updated' : 'Income saved', '✓');
     done();
   };
   return html`
@@ -132,7 +136,7 @@ function TransferForm({ s, edit, preset, done }) {
   const save = () => {
     const data = { t: 'xfer', amt: parseNum(amt), amt2: fx ? parseNum(amt2) : null, from, to, date, note: note || (to === CARD ? 'Card bill paid' : '') };
     if (edit) updateTxn(edit.id, data); else addTxn(data);
-    toast(to === CARD ? 'Plastic Daddy satisfied 💳✨' : 'Switched positions 🔀', '✅');
+    toast(to === CARD ? 'Card bill payment saved' : 'Transfer saved', '✓');
     done();
   };
   return html`
@@ -180,7 +184,7 @@ function SplitForm({ s, done }) {
     const friend = ensureFriend(fid, newName);
     const e = addTxn({ t: 'exp', amt: myShare, cat, from, date, note: note || 'Split bill (my share)' });
     addTxn({ t: 'fout', amt: theirs, from, friend, date, note: note || 'Split bill (their share)', pair: e.id });
-    toast(`Split done. They owe you ${money(theirs)} 😏`, '🍕');
+    toast(`Split saved. They owe you ${money(theirs)}`, '✓');
     done();
   };
   return html`

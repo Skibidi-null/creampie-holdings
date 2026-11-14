@@ -8,22 +8,30 @@ const SPOT = 'https://api.gold-api.com/price/';
 const NBP = 'https://api.nbp.pl/api';
 
 // ---------- exchange rates ----------
+// zł per 1 unit of each currency. NBP (Polish central bank, table A) first; open.er-api for
+// currencies NBP doesn't publish daily (AED). Always overwrites old values so nothing goes stale.
+export const RATE_CURS = ['USD', 'EUR', 'GBP', 'CHF', 'INR', 'AED', 'TRY', 'SAR'];
 export async function refreshRates(force) {
   const s = get();
-  if (!force && s.rates.USD && Date.now() - s.rates.at < 6 * 3600e3) return s.rates;
-  const r = { ...s.rates, PLN: 1 };
+  if (!force && s.rates.USD && s.rates.INR && Date.now() - s.rates.at < 3 * 3600e3) return s.rates;
+  const r = { PLN: 1 };
+  const src = {};
+  let date = null;
   try {
     const j = await (await fetch(`${NBP}/exchangerates/tables/a/?format=json`, { cache: 'no-store' })).json();
-    for (const x of j[0].rates) if (['USD', 'EUR', 'GBP', 'CHF'].includes(x.code)) r[x.code] = x.mid;
+    date = j[0].effectiveDate;
+    for (const x of j[0].rates) if (RATE_CURS.includes(x.code)) { r[x.code] = x.mid; src[x.code] = 'nbp'; }
   } catch {}
   try {
-    const j = await (await fetch('https://open.er-api.com/v6/latest/USD')).json();
+    const j = await (await fetch('https://open.er-api.com/v6/latest/USD', { cache: 'no-store' })).json();
     const pln = j.rates.PLN;
-    if (!r.USD) r.USD = pln;
-    for (const c of ['AED', 'EUR', 'GBP', 'TRY', 'INR', 'SAR']) if (!r[c] && j.rates[c]) r[c] = pln / j.rates[c];
+    for (const c of RATE_CURS) if (!r[c] && j.rates[c] && pln) { r[c] = pln / j.rates[c]; src[c] = 'er'; }
+    if (!date && j.time_last_update_unix) date = iso(new Date(j.time_last_update_unix * 1000));
   } catch {}
-  if (r.USD) { r.at = Date.now(); patch('rates', r); }
-  return r;
+  if (!r.USD) return s.rates; // offline: keep the last saved rates
+  const next = { ...s.rates, ...r, src: { ...(s.rates.src || {}), ...src }, date: date || s.rates.date || null, at: Date.now() };
+  patch('rates', next);
+  return next;
 }
 
 // ---------- live spot ----------

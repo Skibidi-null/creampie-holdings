@@ -34,12 +34,12 @@ export function GoldScreen() {
     <div class="top"><div class="grow"><div class="h-title">${T.nGold}</div><div class="hint">${T.goldLive}</div></div>
       <button class=${`iconbtn ${s.gold.alertsOn ? 'on' : ''}`} onClick=${() => setSheet('alerts')}>🔔</button></div>
 
-    <div class="card goldy hero" style="text-align:center">
+    <div class="card hero" style="text-align:center">
       <div class="scan" style="background:linear-gradient(to bottom,transparent,rgba(255,201,77,.08),transparent)"></div>
       <div class="label"><span class=${`livedot ${lv.price && !lv.err ? '' : 'off'}`}></span>${lv.err && !lv.price ? 'Offline: last known' : 'Live spot · zł per gram'}</div>
-      <div class=${`ticker gold glow-gold ${lv.dir > 0 ? 'flash-up' : lv.dir < 0 ? 'flash-down' : ''}`} key=${lv.ticks}>${p ? num(p) : '…'}</div>
+      <div class="ticker">${p ? num(p) : '…'}</div>
       <div class="row" style="justify-content:center;gap:10px;font-size:13px">
-        ${chg != null && html`<span class=${`mono ${chg >= 0 ? 'up glow-up' : 'down glow-down'}`}>${chg >= 0 ? '▲' : '▼'} ${num(Math.abs(p - lv.dayOpen))} (${pct(chg, 2)})</span><span class="hint">vs yesterday's NBP price</span>`}
+        ${chg != null && html`<span class=${`mono ${chg >= 0 ? 'up' : 'down'}`}>${chg >= 0 ? '▲' : '▼'} ${num(Math.abs(p - lv.dayOpen))} (${pct(chg, 2)})</span><span class="hint">vs yesterday's NBP price</span>`}
       </div>
       <div class="hint" style="margin-top:6px">${lv.usdOz ? `$${num(lv.usdOz)}/oz · ` : ''}${ago != null ? `updated ${ago}s ago` : 'connecting…'} · refreshes every second</div>
       <div class="sep"></div>
@@ -50,7 +50,7 @@ export function GoldScreen() {
     </div>
 
     ${sig && html`<div class=${`signal ${sig.level}`} style="margin-bottom:12px">
-      <div class="row between"><b style="font-size:16px">${sig.level === 'good' ? '🍆 ' + T.buyGood : sig.level === 'ok' ? '😏 ' + T.buyOk : '🥵 ' + T.buyWait}</b></div>
+      <div class="row between"><b style="font-size:16px">${sig.level === 'good' ? T.buyGood : sig.level === 'ok' ? T.buyOk : T.buyWait}</b></div>
       <div class="gauge"><i style=${{ left: `${clamp(100 - ((sig.score + 3) / 8) * 100, 3, 97)}%` }}></i></div>
       <div class="row between hint"><span>Cheap</span><span>Pricey</span></div>
       <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
@@ -62,7 +62,7 @@ export function GoldScreen() {
 
     <div class="card">
       <${Seg} options=${RANGES.map(([k]) => [k, k])} value=${range} onChange=${setRange} />
-      <div style="margin-top:10px"><${LineChart} pts=${series.pts} time=${series.time} color="#ffc94d" fmt=${(v) => num(v) + ' zł/g'} refLine=${g.avgMarket || null} /></div>
+      <div style="margin-top:10px"><${LineChart} pts=${series.pts} time=${series.time} color="#a87414" fmt=${(v) => num(v) + ' zł/g'} refLine=${g.avgMarket || null} /></div>
       ${g.avgMarket ? html`<div class="hint"><span class="cyan">- - -</span> market price at your buys (${num(g.avgMarket)} zł) · <span class="up">●</span> low · <span class="down">●</span> high</div>` : html`<div class="hint"><span class="up">●</span> lowest · <span class="down">●</span> highest</div>`}
       ${st && html`<div class="stat3" style="margin-top:10px">
         <div><div class="l">Low</div><div class="v up">${num(st.lo[1])}</div><div class="d">${fmtT(st.lo[0], series.time)}</div></div>
@@ -73,9 +73,9 @@ export function GoldScreen() {
     </div>
 
     <div class="sect"><span class="h-title">Your gold 🪙</span><button class="more" onClick=${() => setSheet({ buy: {} })}>＋ ${T.boughtGold}</button></div>
-    <div class="card goldy">
+    <div class="card">
       ${g.grams ? html`
-        <div class="row between"><div><div class="hint">You own</div><div class="mono gold glow-gold" style="font-size:28px;font-weight:800">${num(g.grams, 2)} g</div></div>
+        <div class="row between"><div><div class="hint">You own</div><div class="mono gold" style="font-size:26px;font-weight:700">${num(g.grams, 2)} g</div></div>
           <div style="text-align:right"><div class="hint">Worth now (spot)</div><div style="font-size:20px;font-weight:800"><${Money} v=${g.value} /></div></div></div>
         <div class="sep"></div>
         <div class="kv">
@@ -87,7 +87,7 @@ export function GoldScreen() {
           <span>If you sold back (~${s.gold.sellSpread}% below spot)</span><${Money} v=${g.value * (1 - s.gold.sellSpread / 100) - g.paid} sign cls=${g.value * (1 - s.gold.sellSpread / 100) - g.paid >= 0 ? 'up' : 'down'} />
         </div>
         ${goalG > 0 && html`<div style="margin-top:12px"><div class="row between hint"><span>Goal: ${num(goalG, 0)} g</span><span>${Math.round((g.grams / goalG) * 100)}%</span></div><${Bar} v=${g.grams / goalG} cls="gold" /></div>`}
-      ` : html`<div class="empty"><span class="e">🪙</span>No gold logged yet. Get some bling, daddy.<div style="margin-top:12px"><button class="btn goldbtn" onClick=${() => setSheet({ buy: {} })}>${T.boughtGold}</button></div></div>`}
+      ` : html`<div class="empty"><span class="e">🪙</span>No gold logged yet.<div style="margin-top:12px"><button class="btn goldbtn" onClick=${() => setSheet({ buy: {} })}>${T.boughtGold}</button></div></div>`}
     </div>
     ${s.gold.buys.length > 0 && html`<div class="card" style="padding:4px 12px">
       ${[...s.gold.buys].sort((a, b) => b.date.localeCompare(a.date)).map((b) => {
@@ -100,7 +100,7 @@ export function GoldScreen() {
       })}
     </div>`}
 
-    <div class="sect"><span class="h-title">Hot Gossip 🗞️</span><button class="more" onClick=${() => nav('news')}>All news →</button></div>
+    <div class="sect"><span class="h-title">Gold news</span><button class="more" onClick=${() => nav('news')}>All news →</button></div>
     <div class="card" style="padding:6px 14px"><${NewsList} news=${news} max=${3} /></div>
 
     <div class="sect"><span class="h-title">When was it cheapest?</span></div>
@@ -114,8 +114,8 @@ export function GoldScreen() {
     ${dips.length > 0 && html`<div class="card">
       <b>Biggest dips: the best times to have bought</b>
       <div class="list" style="margin-top:6px">${dips.map((d) => html`<div class="item">
-        <span class="em">${d.ongoing ? '🔥' : '📉'}</span>
-        <div class="grow"><div class="t1">−${d.pct.toFixed(1)}% ${d.ongoing ? html`<span class="tag watch">happening now</span>` : ''}</div>
+        <span class="em">📉</span>
+        <div class="grow"><div class="t1">−${d.pct.toFixed(1)}% ${d.ongoing ? html`<span class="tag watch">ongoing</span>` : ''}</div>
           <div class="t2">${niceDate(d.peak[0])} ${num(d.peak[1])} → ${niceDate(d.trough[0])} ${num(d.trough[1])} zł</div></div>
       </div>`)}</div>
     </div>`}
@@ -136,8 +136,8 @@ export function GoldScreen() {
 const fmtT = (t, time) => { const d = new Date(t); return time ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: '2-digit' }); };
 
 export function NewsList({ news, max = 50 }) {
-  if (!news) return html`<div class="empty" style="padding:16px">Listening for gossip…</div>`;
-  if (!news.items || !news.items.length) return html`<div class="empty" style="padding:16px">No juicy news right now.</div>`;
+  if (!news) return html`<div class="empty" style="padding:16px">Loading news…</div>`;
+  if (!news.items || !news.items.length) return html`<div class="empty" style="padding:16px">No news right now.</div>`;
   return news.items.slice(0, max).map((n) => html`<a class="news" href=${n.link} target="_blank" rel="noopener">
     <div class="row" style="gap:6px;margin-bottom:4px">
       <span class=${`tag ${n.impact}`}>${n.impact === 'up' ? '▲ may rise' : n.impact === 'down' ? '▼ may fall' : '● watch'}</span>
@@ -154,7 +154,7 @@ export function NewsScreen() {
   useEffect(() => { fetchNews().then((n) => setNews(n || { items: [] })); }, []);
   const up = news && news.items ? news.items.filter((n) => n.impact === 'up').length : 0;
   const down = news && news.items ? news.items.filter((n) => n.impact === 'down').length : 0;
-  const mood = up > down * 1.3 ? ['up', 'Gossip leans BULLISH: things that usually push gold up 🍆'] : down > up * 1.3 ? ['down', 'Gossip leans BEARISH: things that usually pull gold down 📉'] : ['watch', 'Mixed signals. Stay alert 👀'];
+  const mood = up > down * 1.3 ? ['up', 'News leans positive: things that usually push gold up'] : down > up * 1.3 ? ['down', 'News leans negative: things that usually pull gold down'] : ['watch', 'Mixed news'];
   return html`<div>
     ${news && news.items && news.items.length > 0 && html`<div class=${`signal ${mood[0] === 'up' ? 'good' : mood[0] === 'down' ? 'wait' : 'ok'}`} style="margin-bottom:12px">
       <b>${mood[1]}</b>
@@ -171,7 +171,7 @@ function AlertSheet({ onClose, price }) {
   const g = s.gold;
   const [below, setBelow] = useState(g.below ? String(g.below) : '');
   const [status, setStatus] = useState(null);
-  const save = () => { patch('gold', { below: valid(below) ? parseNum(below) : null }); toast('Alerts set. I\'ll ping you when it goes down 😈', '🔔'); };
+  const save = () => { patch('gold', { below: valid(below) ? parseNum(below) : null }); toast('Alerts saved', '🔔'); };
   const turnOn = async () => {
     setStatus('…');
     const r = await enablePush();
@@ -227,7 +227,7 @@ function BuySheet({ buy, price, onClose }) {
     else if (txn && from) updateTxn(txn, { amt: total, from, date });
     else if (!txn && from) txn = addTxn({ t: 'gold', amt: total, from, date, note: `${num(grams, 2)} g gold` }).id;
     upsertBuy({ ...(edit ? { id: buy.id } : {}), date, g: grams, paid: +perGram.toFixed(2), market: valid(market) ? parseNum(market) : null, note, txn });
-    toast(edit ? 'Updated 🪙' : `${num(grams, 2)} g of bling added. Shiny 😍`, '🪙');
+    toast(edit ? 'Updated' : `${num(grams, 2)} g gold added`, '✓');
     close();
   };
   return html`<${Sheet} title=${edit ? 'Edit gold buy' : '🪙 ' + T.boughtGold} onClose=${onClose}>${(close) => html`

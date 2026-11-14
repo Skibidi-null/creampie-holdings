@@ -47,7 +47,7 @@ export function Activity() {
   const found = query ? list.filter((t) => t.t === 'exp').reduce((a, t) => a + txnPln(s, t), 0) : 0;
 
   return html`<div class="screen">
-    <div class="top"><div class="grow"><div class="h-title">${T.nActivity}</div><div class="hint">Every naughty purchase, on the record</div></div></div>
+    <div class="top"><div class="grow"><div class="h-title">${T.nActivity}</div><div class="hint">All your entries</div></div></div>
     <input class="input" placeholder="🔍  Search: haircut, kebab, 50…" value=${q} onInput=${(e) => setQ(e.target.value)} style="margin-bottom:10px" />
     ${!query && html`<div class="row between" style="margin:4px 2px 10px">
       <button class="iconbtn" onClick=${() => setYm(prevYm(ym))}>‹</button>
@@ -55,18 +55,18 @@ export function Activity() {
       <button class="iconbtn" onClick=${() => setYm(nextYm(ym))} disabled=${ym >= thisYm()} style=${{ opacity: ym >= thisYm() ? 0.3 : 1 }}>›</button>
     </div>
     <div class="stat3" style="margin-bottom:10px">
-      <div><div class="l">Blown</div><div class="v"><${Money} v=${ms.spend} d=${0} /></div></div>
+      <div><div class="l">Spent</div><div class="v"><${Money} v=${ms.spend} d=${0} /></div></div>
       <div><div class="l">Came in</div><div class="v up"><${Money} v=${ms.income} d=${0} /></div></div>
       <div><div class="l">Net</div><div class=${`v ${ms.net >= 0 ? 'up' : 'down'}`}><${Money} v=${ms.net} d=${0} /></div></div>
     </div>`}
     ${query && html`<div class="card" style="padding:12px"><b>${list.length}</b> matches${found ? html` · spent <${Money} v=${found} cls="pink" />` : ''}</div>`}
-    <${Seg} options=${[['all', 'All'], ['exp', 'Spent'], ['inc', 'Income'], ['other', 'Moves & favours']]} value=${kind} onChange=${setKind} />
+    <${Seg} options=${[['all', 'All'], ['exp', 'Spent'], ['inc', 'Income'], ['other', 'Other']]} value=${kind} onChange=${setKind} />
     ${groups.length ? groups.map((g) => {
       const daySpend = g.items.filter((t) => t.t === 'exp').reduce((a, t) => a + txnPln(s, t), 0);
       return html`<div>
         <div class="dayhead"><span>${niceDate(g.date)}</span>${daySpend > 0 && html`<${Money} v=${-daySpend} />`}</div>
         <div class="card" style="padding:4px 12px;margin-bottom:6px">${g.items.map((t) => html`<${TxnRow} t=${t} s=${s} key=${t.id} />`)}</div>
       </div>`;
-    }) : html`<${Empty} text=${query ? 'Nothing matches. Try something else 😏' : T.empty} />`}
+    }) : html`<${Empty} text=${query ? 'Nothing matches.' : T.empty} />`}
   </div>`;
 }

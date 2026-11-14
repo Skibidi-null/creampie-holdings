@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="sc_add">Blow some cash</string>
-    <string name="sc_gold">Gold Digger</string>
+    <string name="sc_add">Add expense</string>
+    <string name="sc_gold">Gold</string>
     <string name="widget_desc">Today\'s spending and live gold</string>
 </resources>
