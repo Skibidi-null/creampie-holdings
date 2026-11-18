@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 const webpush = createRequire(import.meta.url)('web-push');
+import { computeSignals, parseQuotes, QUOTE_URL, SYMS } from '../web/src/signals.js';
 
 const { VAPID_PUBLIC, VAPID_PRIVATE, CFG_PRIVATE, TOPIC } = process.env;
 const STATE = process.env.STATE_FILE || 'state/state.json';
@@ -69,33 +70,35 @@ async function goldPLN() {
 
 // ---------- news ----------
 const RULES = [
-  // [regex, impact, strength, why]
-  [/\b(rate[- ]cuts?|cuts? (interest )?rates?|cutting rates|dovish|easing cycle|pause hikes?)\b/i, 'up', 2, 'Lower interest rates usually make gold more attractive'],
-  [/\b(rate[- ]hikes?|hikes? (interest )?rates?|raising rates|hawkish|tighten(ing)?|higher for longer)\b/i, 'down', 2, 'Higher interest rates usually weigh on gold'],
-  [/\b(war|invasion|invade[sd]?|missiles?|airstrikes?|attacks?|military|escalat\w*|conflict|nuclear)\b/i, 'up', 2, 'Fear and conflict push people into gold as a safe haven'],
-  [/\b(ceasefire|cease-fire|peace (deal|talks|agreement)|truce|de-?escalat\w*)\b/i, 'down', 2, 'Calmer world → less demand for safe-haven gold'],
-  [/\b(dollar (falls?|slides?|weakens?|slumps?|drops?|dips?|eases?)|weak(er)? dollar)\b/i, 'up', 1, 'A weaker dollar makes gold cheaper for the world to buy'],
-  [/\b(dollar (rises?|gains?|jumps?|strengthens?|firms?|rall(y|ies)|climbs?)|strong(er)? dollar)\b/i, 'down', 1, 'A stronger dollar usually pushes gold down'],
-  [/\b(yields? (fall|drop|slide|ease|decline)s?)\b/i, 'up', 1, 'Falling bond yields help gold'],
-  [/\b(yields? (rise|jump|climb|surge|spike)s?)\b/i, 'down', 1, 'Rising bond yields compete with gold'],
-  [/\b(inflation (rises?|jumps?|accelerates?|heats?|hotter|surges?)|hot(ter)? inflation|sticky inflation)\b/i, 'up', 1, 'Rising inflation boosts gold as a store of value'],
+  // [regex, impact, strength, why, category]
+  [/\b(rate[- ]cuts?|cuts? (interest )?rates?|cutting rates|dovish|easing cycle|pause hikes?)\b/i, 'up', 2, 'Lower interest rates usually make gold more attractive', 'cut'],
+  [/\b(rate[- ]hikes?|hikes? (interest )?rates?|raising rates|hawkish|tighten(ing)?|higher for longer)\b/i, 'down', 2, 'Higher interest rates usually weigh on gold', 'hike'],
+  [/\b(war|invasion|invade[sd]?|missiles?|airstrikes?|attacks?|military|escalat\w*|conflict|nuclear)\b/i, 'up', 2, 'Fear and conflict push people into gold as a safe haven', 'war'],
+  [/\b(ceasefire|cease-fire|peace (deal|talks|agreement)|truce|de-?escalat\w*)\b/i, 'down', 2, 'Calmer world → less demand for safe-haven gold', 'peace'],
+  [/\b(dollar (falls?|slides?|weakens?|slumps?|drops?|dips?|eases?)|weak(er)? dollar)\b/i, 'up', 1, 'A weaker dollar makes gold cheaper for the world to buy', 'usdDown'],
+  [/\b(dollar (rises?|gains?|jumps?|strengthens?|firms?|rall(y|ies)|climbs?)|strong(er)? dollar)\b/i, 'down', 1, 'A stronger dollar usually pushes gold down', 'usdUp'],
+  [/\b(yields? (fall|drop|slide|ease|decline)s?)\b/i, 'up', 1, 'Falling bond yields help gold', 'yieldsDown'],
+  [/\b(yields? (rise|jump|climb|surge|spike)s?)\b/i, 'down', 1, 'Rising bond yields compete with gold', 'yieldsUp'],
+  [/\b(inflation (rises?|jumps?|accelerates?|heats?|hotter|surges?)|hot(ter)? inflation|sticky inflation)\b/i, 'up', 1, 'Rising inflation boosts gold as a store of value', 'inflUp'],
   [/\b(inflation (cools?|eases?|slows?|falls?)|disinflation)\b/i, 'down', 1, 'Cooling inflation reduces the need for gold'],
-  [/\b(recession|crisis|crash|turmoil|sell-?off|bank (failure|collapse)|default|shutdown|debt ceiling)\b/i, 'up', 2, 'Economic stress drives safe-haven buying'],
-  [/\b(central banks? (buy|bought|buying|add|purchases?)|record (central bank )?purchases|PBOC|reserves? (buying|purchases))\b/i, 'up', 1, 'Central banks buying gold supports the price'],
+  [/\b(recession|crisis|crash|turmoil|sell-?off|bank (failure|collapse)|default|shutdown|debt ceiling)\b/i, 'up', 2, 'Economic stress drives safe-haven buying', 'crash'],
+  [/\b(central banks? (buy|bought|buying|add|purchases?)|record (central bank )?purchases|PBOC|reserves? (buying|purchases))\b/i, 'up', 1, 'Central banks buying gold supports the price', 'cb'],
   [/\b(tariffs?|trade war|sanctions?)\b/i, 'up', 1, 'Trade tensions and sanctions add uncertainty'],
   [/\b(strong (jobs|payrolls|data)|jobs (beat|surge)|economy (booms|strong))\b/i, 'down', 1, 'Strong economy → fewer rate cuts → weaker gold'],
   [/\bgold\b.*\b(hits?|tops?|soars?|surges?|jumps?|rall(y|ies)|climbs?|rises?|gains?|up \d|higher|record|all-time high|rebounds?|recovers?)\b/i, 'up', 1, 'Momentum: gold is moving up'],
   [/\bgold\b.*\b(falls?|slips?|drops?|tumbles?|slides?|sinks?|plunges?|retreats?|dips?|eases?|loses?|lower|down( over)? \d|declines?|erases?|(one|1|multi)-(year|month|week) low|lowest|weak(er)? demand|fading demand)\b/i, 'down', 1, 'Momentum: gold is moving down'],
   [/\b(profit[- ]taking|risk[- ]on|stocks? (rally|surge|record))\b/i, 'down', 1, 'Investors moving from gold into riskier assets'],
+  [/\b(margin calls?|dash for cash|forced selling|liquidat\w+)\b/i, 'down', 2, 'Traders selling gold to cover losses elsewhere (usually short-lived)', 'crash'],
 ];
 
 function classify(title) {
-  let up = 0, down = 0; const why = [];
-  for (const [re, imp, w, reason] of RULES) {
-    if (re.test(title)) { if (imp === 'up') up += w; else down += w; if (why.length < 1) why.push(reason); }
+  let up = 0, down = 0; const why = []; let cat = null;
+  for (const [re, imp, w, reason, c] of RULES) {
+    if (re.test(title)) { if (imp === 'up') up += w; else down += w; if (why.length < 1) why.push(reason); if (!cat && c) cat = c; }
   }
+  if (cat === 'crash' && /gold|bullion/i.test(title) && !/stock|equit|market|bank|recession/i.test(title)) cat = null;
   const impact = up > down ? 'up' : down > up ? 'down' : 'watch';
-  return { impact, strength: Math.abs(up - down) || (up + down ? 1 : 0), why: why[0] || (/(fed|federal reserve|powell|ecb|inflation|cpi)/i.test(title) ? 'Central-bank & inflation news often moves gold' : '') };
+  return { impact, cat, strength: Math.abs(up - down) || (up + down ? 1 : 0), why: why[0] || (/(fed|federal reserve|powell|warsh|ecb|inflation|cpi)/i.test(title) ? 'Central-bank & inflation news often moves gold' : '') };
 }
 
 const QUERIES = ['gold price', 'gold prices fed', 'federal reserve interest rates', 'geopolitical tensions markets', 'us dollar index'];
@@ -114,7 +117,7 @@ async function refreshNews() {
         if (now - Date.parse(date) > 48 * 3600e3) continue;
         const key = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 80);
         if (items.has(key)) continue;
-        const relevant = /gold|bullion|fed|federal reserve|powell|rates?|inflation|dollar|treasur|yields?|war|ceasefire|tariff|central bank|recession/i.test(title);
+        const relevant = /gold|bullion|fed|federal reserve|powell|warsh|rates?|inflation|dollar|treasur|yields?|war|ceasefire|tariff|central bank|recession/i.test(title);
         if (!relevant) continue;
         items.set(key, { id: crypto.createHash('sha1').update(key).digest('hex').slice(0, 10), title, source, link: get('link'), date, ...classify(title), gold: /gold|bullion/i.test(title) });
       }
@@ -166,6 +169,31 @@ if (newsAge > 55 * 60e3 || process.env.FORCE_NEWS) {
 }
 news ||= newsFile;
 
+// ---------- calendar + early warnings (every run; file only changes when they change) ----------
+let quotes = {};
+try { quotes = parseQuotes(await (await fetch(QUOTE_URL(Object.values(SYMS)), { headers: { 'User-Agent': 'Mozilla/5.0' } })).json()); log('quotes', Object.keys(quotes).length); } catch (e) { log('quotes error', e.message); }
+let cal = (news && news.cal) || (newsFile && newsFile.cal) || [];
+if (!news || !news.calAt || now - news.calAt > 3 * 3600e3) {
+  try {
+    const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (r.ok) {
+      cal = (await r.json()).filter((e) => (e.country === 'USD' && e.impact !== 'Low' && e.impact !== 'Holiday') || (e.impact === 'High' && ['EUR', 'CNY'].includes(e.country)))
+        .map(({ title, country, date, impact, forecast, previous }) => ({ title, country, date: new Date(date).toISOString(), impact, forecast, previous }));
+      if (news) news.calAt = now;
+      log('calendar', cal.length);
+    }
+  } catch (e) { log('calendar error', e.message); }
+}
+const signals = computeSignals(quotes, cal, now);
+if (news) {
+  // keep the text of signals already published so the file (and the site) only changes when the SET changes
+  const oldS = new Map((news.signals || []).map((x) => [x.id, x]));
+  const nextS = signals.map((x) => oldS.get(x.id) || x);
+  const changed = JSON.stringify(nextS.map((x) => x.id)) !== JSON.stringify((news.signals || []).map((x) => x.id)) || JSON.stringify(cal) !== JSON.stringify(news.cal || []);
+  news.signals = nextS; news.cal = cal;
+  if (changed) { fs.writeFileSync(NEWS, JSON.stringify(news)); log('signals', nextS.map((x) => x.id).join(' ') || 'none'); }
+}
+
 if (VAPID_PUBLIC && VAPID_PRIVATE) webpush.setVapidDetails(APP_URL, VAPID_PUBLIC, VAPID_PRIVATE);
 
 const dayAgo = now - 24 * 3600e3;
@@ -186,7 +214,7 @@ for (const [id, dev] of Object.entries(state.devices)) {
     }
     if (g.dropPct && hi24 && coverage > 3 * 3600e3) {
       const drop = ((hi24 - price) / hi24) * 100;
-      if (drop >= g.dropPct && now - (f.dropAt || 0) > 6 * 3600e3) { sends.push({ title: `🔥 Gold dropped ${drop.toFixed(1)}% today`, body: `${price.toFixed(2)} zł/g, down from ${hi24.toFixed(2)} in the last 24 hours.`, url: APP_URL + '#/gold', tag: 'gold-drop' }); f.dropAt = now; }
+      if (drop >= g.dropPct && now - (f.dropAt || 0) > 6 * 3600e3) { sends.push({ title: `Gold dropped ${drop.toFixed(1)}% today`, body: `${price.toFixed(2)} zł/g, down from ${hi24.toFixed(2)} in the last 24 hours.`, url: APP_URL + '#/gold', tag: 'gold-drop' }); f.dropAt = now; }
     }
   }
   if (g.news && news && news.items) {
@@ -195,11 +223,25 @@ for (const [id, dev] of Object.entries(state.devices)) {
     const fresh = news.items.filter((n) => n.gold && n.impact !== 'watch' && n.strength >= 2 && now - Date.parse(n.date) < 6 * 3600e3 && !f.seen.includes(n.id));
     if (fresh.length && (f.newsCount || 0) < 3 && L.hour >= 8 && L.hour < 23) {
       const n = fresh[0];
-      sends.push({ title: n.impact === 'up' ? '🗞️ Hot gossip: gold may RISE ▲' : '🗞️ Hot gossip: gold may FALL ▼', body: `${n.title}\n${n.why}. Stay alert 👀`, url: APP_URL + '#/news', tag: 'news' });
+      sends.push({ title: n.impact === 'up' ? 'News: gold may rise ▲' : 'News: gold may fall ▼', body: `${n.title}\n${n.why}.`, url: APP_URL + '#/news', tag: 'news' });
       f.newsCount = (f.newsCount || 0) + 1;
     }
     for (const n of fresh) f.seen.push(n.id);
     f.seen = f.seen.slice(-200);
+  }
+  if (g.signals !== false && g.on !== false && signals.length) {
+    f.sig ||= [];
+    f.sigDay ||= ''; if (f.sigDay !== L.date) { f.sigDay = L.date; f.sigCount = 0; }
+    const fresh = signals.filter((x) => x.level === 'high' && !f.sig.includes(x.id));
+    if (fresh.length && (f.sigCount || 0) < 4 && L.hour >= 7 && L.hour < 23) {
+      const x = fresh[0];
+      const when = x.when ? new Intl.DateTimeFormat('en-GB', { timeZone: c.tz || 'Europe/Warsaw', weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(x.when)) + ' · ' : '';
+      sends.push({ title: (x.dir === 'up' ? '▲ ' : x.dir === 'down' ? '▼ ' : '! ') + x.title, body: when + x.body, url: APP_URL + '#/gold', tag: 'sig-' + x.id });
+      f.sigCount = (f.sigCount || 0) + 1;
+    }
+    // quiet hours: mark as seen anyway so old warnings don't arrive in the morning
+    for (const x of (L.hour >= 7 && L.hour < 23 ? fresh.slice(0, 1) : fresh)) f.sig.push(x.id);
+    f.sig = f.sig.slice(-100);
   }
   const card = c.card || {};
   if (card.on && card.dueDay && card.owed > 0 && L.hour >= 9 && L.hour < 21) {

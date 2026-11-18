@@ -6,6 +6,9 @@ import { enablePush, isNative, isIOS, isStandalone } from './push.js';
 import { T } from './copy.js';
 import { num, money, pct, today, niceDate, parseNum, shortMonth, clamp } from './util.js';
 import { nav } from './home.js';
+import { Icon } from './icons.js';
+import { drivers, outlook } from './market.js';
+import { OutlookCard, Signals, Drivers, Calendar, HistoryLessons, Guide, newsHistory, useMarketScreen } from './outlook.js';
 
 export function GoldScreen() {
   const s = useStore();
@@ -29,19 +32,22 @@ export function GoldScreen() {
   const ago = lv.at ? Math.max(0, Math.round((Date.now() - lv.at) / 1000)) : null;
   const cheapest = [...seas].filter((x) => x.n).sort((a, b) => a.avg - b.avg).slice(0, 3);
   const goalG = s.gold.goalGrams;
+  const [tab, setTabS] = useState(() => sessionStorage.getItem('cp.goldtab') || 'today');
+  const setTab = (t) => { setTabS(t); try { sessionStorage.setItem('cp.goldtab', t); } catch {} };
+  const mk = useMarketScreen();
+  const olDir = useMemo(() => (Object.keys(mk.q).length > 3 ? outlook(drivers(), p).days.dir : null), [mk.ticks]);
 
   return html`<div class="screen">
     <div class="top"><div class="grow"><div class="h-title">${T.nGold}</div><div class="hint">${T.goldLive}</div></div>
-      <button class=${`iconbtn ${s.gold.alertsOn ? 'on' : ''}`} onClick=${() => setSheet('alerts')}>🔔</button></div>
+      <button class=${`iconbtn ${s.gold.alertsOn ? 'on' : ''}`} onClick=${() => setSheet('alerts')} aria-label="Alerts"><${Icon} n="bell" /></button></div>
 
     <div class="card hero" style="text-align:center">
-      <div class="scan" style="background:linear-gradient(to bottom,transparent,rgba(255,201,77,.08),transparent)"></div>
       <div class="label"><span class=${`livedot ${lv.price && !lv.err ? '' : 'off'}`}></span>${lv.err && !lv.price ? 'Offline: last known' : 'Live spot · zł per gram'}</div>
       <div class="ticker">${p ? num(p) : '…'}</div>
       <div class="row" style="justify-content:center;gap:10px;font-size:13px">
         ${chg != null && html`<span class=${`mono ${chg >= 0 ? 'up' : 'down'}`}>${chg >= 0 ? '▲' : '▼'} ${num(Math.abs(p - lv.dayOpen))} (${pct(chg, 2)})</span><span class="hint">vs yesterday's NBP price</span>`}
       </div>
-      <div class="hint" style="margin-top:6px">${lv.usdOz ? `$${num(lv.usdOz)}/oz · ` : ''}${ago != null ? `updated ${ago}s ago` : 'connecting…'} · refreshes every second</div>
+      <div class="hint" style="margin-top:6px">${lv.usdOz ? `$${num(lv.usdOz)}/oz · ` : ''}${ago != null ? `updated ${ago}s ago` : 'connecting…'}</div>
       <div class="sep"></div>
       <div class="row between" style="font-size:13px">
         <span class="dim">Shop price estimate<div class="hint">spot + your ${num(premium * 100, 1)}% premium</div></span>
@@ -49,17 +55,13 @@ export function GoldScreen() {
       </div>
     </div>
 
-    ${sig && html`<div class=${`signal ${sig.level}`} style="margin-bottom:12px">
-      <div class="row between"><b style="font-size:16px">${sig.level === 'good' ? T.buyGood : sig.level === 'ok' ? T.buyOk : T.buyWait}</b></div>
-      <div class="gauge"><i style=${{ left: `${clamp(100 - ((sig.score + 3) / 8) * 100, 3, 97)}%` }}></i></div>
-      <div class="row between hint"><span>Cheap</span><span>Pricey</span></div>
-      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        ${sig.reasons.map((r) => html`<div style="font-size:13px"><span class=${r.good ? 'up' : r.good === false ? 'down' : 'gold'}>${r.good ? '✔' : r.good === false ? '✖' : '●'}</span> ${r.text}</div>`)}
-        ${p5 != null && html`<div style="font-size:13px"><span class="cyan">◆</span> Over 5 years, gold was cheaper than today on ${p5.toFixed(0)}% of days</div>`}
-      </div>
-      <div class="note" style="margin-top:8px">Based on price history only. A guide, not financial advice.</div>
-    </div>`}
+    <div class="tabs5"><${Seg} options=${[['today', 'Today'], ['drivers', 'Drivers'], ['events', 'Events'], ['history', 'History'], ['learn', 'Learn']]} value=${tab} onChange=${setTab} /></div>
 
+    ${tab === 'today' && html`
+    <div class="sect"><span class="h-title">Warnings</span><span class="hint">live</span></div>
+    <${Signals} max=${4} />
+    <div class="sect"><span class="h-title">Outlook</span><button class="more" onClick=${() => setTab('drivers')}>Why →</button></div>
+    <${OutlookCard} price=${p} />
     <div class="card">
       <${Seg} options=${RANGES.map(([k]) => [k, k])} value=${range} onChange=${setRange} />
       <div style="margin-top:10px"><${LineChart} pts=${series.pts} time=${series.time} color="#a87414" fmt=${(v) => num(v) + ' zł/g'} refLine=${g.avgMarket || null} /></div>
@@ -72,7 +74,20 @@ export function GoldScreen() {
       ${range === '1D' && series.pts.length < 5 && html`<div class="note" style="margin-top:8px">The 1-day chart builds while the app is open. Older ranges use the official NBP price.</div>`}
     </div>
 
-    <div class="sect"><span class="h-title">Your gold 🪙</span><button class="more" onClick=${() => setSheet({ buy: {} })}>＋ ${T.boughtGold}</button></div>
+    ${sig && html`<div class="sect"><span class="h-title">Buy timing</span><span class="hint">from zł price history</span></div><div class=${`signal ${sig.level}`} style="margin-bottom:12px">
+      <div class="row between"><b style="font-size:16px">${sig.level === 'good' ? T.buyGood : sig.level === 'ok' ? T.buyOk : T.buyWait}</b></div>
+      <div class="gauge"><i style=${{ left: `${clamp(100 - ((sig.score + 3) / 8) * 100, 3, 97)}%` }}></i></div>
+      <div class="row between hint"><span>Cheap</span><span>Pricey</span></div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+        ${sig.reasons.map((r) => html`<div style="font-size:13px"><span class=${r.good ? 'up' : r.good === false ? 'down' : 'gold'}>${r.good ? '✔' : r.good === false ? '✖' : '●'}</span> ${r.text}</div>`)}
+        ${p5 != null && html`<div style="font-size:13px"><span class="cyan">◆</span> Over 5 years, gold was cheaper than today on ${p5.toFixed(0)}% of days</div>`}
+      </div>
+      ${sig.level !== 'wait' && olDir === 'down' && html`<div class="callout" style="margin-top:10px">Cheap compared with its history, but the live outlook still leans down, so it could get cheaper. Buying in small parts spreads the risk.</div>`}
+      ${sig.level === 'wait' && olDir === 'up' && html`<div class="callout" style="margin-top:10px">Pricey compared with its history, and the outlook leans up, so waiting for a dip might not pay off.</div>`}
+      <div class="note" style="margin-top:8px">Based on the zł price history only. A guide, not financial advice.</div>
+    </div>`}
+
+    <div class="sect"><span class="h-title">Your gold</span><button class="more" onClick=${() => setSheet({ buy: {} })}>＋ ${T.boughtGold}</button></div>
     <div class="card">
       ${g.grams ? html`
         <div class="row between"><div><div class="hint">You own</div><div class="mono gold" style="font-size:26px;font-weight:700">${num(g.grams, 2)} g</div></div>
@@ -87,13 +102,13 @@ export function GoldScreen() {
           <span>If you sold back (~${s.gold.sellSpread}% below spot)</span><${Money} v=${g.value * (1 - s.gold.sellSpread / 100) - g.paid} sign cls=${g.value * (1 - s.gold.sellSpread / 100) - g.paid >= 0 ? 'up' : 'down'} />
         </div>
         ${goalG > 0 && html`<div style="margin-top:12px"><div class="row between hint"><span>Goal: ${num(goalG, 0)} g</span><span>${Math.round((g.grams / goalG) * 100)}%</span></div><${Bar} v=${g.grams / goalG} cls="gold" /></div>`}
-      ` : html`<div class="empty"><span class="e">🪙</span>No gold logged yet.<div style="margin-top:12px"><button class="btn goldbtn" onClick=${() => setSheet({ buy: {} })}>${T.boughtGold}</button></div></div>`}
+      ` : html`<div class="empty"><span class="e"><${Icon} n="coin" size=${32} sw=${1.4} /></span>No gold logged yet.<div style="margin-top:12px"><button class="btn goldbtn" onClick=${() => setSheet({ buy: {} })}>${T.boughtGold}</button></div></div>`}
     </div>
     ${s.gold.buys.length > 0 && html`<div class="card" style="padding:4px 12px">
       ${[...s.gold.buys].sort((a, b) => b.date.localeCompare(a.date)).map((b) => {
         const now = p ? (p - b.paid) / b.paid * 100 : 0;
         return html`<button class="item" onClick=${() => setSheet({ buy: b })}>
-          <span class="em">🪙</span>
+          <span class="em gold"><${Icon} n="coin" size=${19} /></span>
           <div class="grow"><div class="t1">${num(b.g, 2)} g at ${num(b.paid)} zł/g</div><div class="t2">${niceDate(b.date)} · market was ${num(b.market || 0)} · premium ${b.market ? num(((b.paid - b.market) / b.market) * 100, 1) + '%' : '—'}</div></div>
           <span class=${`amt mono ${now >= 0 ? 'up' : 'down'}`}>${pct(now)}</span>
         </button>`;
@@ -103,7 +118,11 @@ export function GoldScreen() {
     <div class="sect"><span class="h-title">Gold news</span><button class="more" onClick=${() => nav('news')}>All news →</button></div>
     <div class="card" style="padding:6px 14px"><${NewsList} news=${news} max=${3} /></div>
 
-    <div class="sect"><span class="h-title">When was it cheapest?</span></div>
+`}
+    ${tab === 'drivers' && html`<${Drivers} />`}
+    ${tab === 'events' && html`<${Calendar} />`}
+    ${tab === 'history' && html`<${HistoryLessons} />
+    <div class="sect"><span class="h-title">Gold in zł since 2013</span></div>
     ${cheapest.length > 0 && html`<div class="card">
       <b>Historically cheaper months</b>
       <div class="hint" style="margin-bottom:8px">How each month's average price compared with its year (${seas[0].n} full years of NBP data). Green = cheaper than usual.</div>
@@ -114,7 +133,7 @@ export function GoldScreen() {
     ${dips.length > 0 && html`<div class="card">
       <b>Biggest dips: the best times to have bought</b>
       <div class="list" style="margin-top:6px">${dips.map((d) => html`<div class="item">
-        <span class="em">📉</span>
+        <span class="em down"><${Icon} n="down" size=${19} /></span>
         <div class="grow"><div class="t1">−${d.pct.toFixed(1)}% ${d.ongoing ? html`<span class="tag watch">ongoing</span>` : ''}</div>
           <div class="t2">${niceDate(d.peak[0])} ${num(d.peak[1])} → ${niceDate(d.trough[0])} ${num(d.trough[1])} zł</div></div>
       </div>`)}</div>
@@ -127,6 +146,9 @@ export function GoldScreen() {
       </div>`)}</div>
       <div class="note">NBP official gold price (zł per gram), since 2013.</div>
     </div>`}
+
+`}
+    ${tab === 'learn' && html`<${Guide} />`}
 
     ${sheet === 'alerts' && html`<${AlertSheet} onClose=${() => setSheet(null)} price=${p} />`}
     ${sheet && sheet.buy && html`<${BuySheet} buy=${sheet.buy} price=${p} onClose=${() => setSheet(null)} />`}
@@ -141,10 +163,11 @@ export function NewsList({ news, max = 50 }) {
   return news.items.slice(0, max).map((n) => html`<a class="news" href=${n.link} target="_blank" rel="noopener">
     <div class="row" style="gap:6px;margin-bottom:4px">
       <span class=${`tag ${n.impact}`}>${n.impact === 'up' ? '▲ may rise' : n.impact === 'down' ? '▼ may fall' : '● watch'}</span>
-      <span class="hint">${n.source} · ${agoStr(n.date)}</span>
+      <span class="hint"><bdi>${n.source}</bdi> · ${agoStr(n.date)}</span>
     </div>
     <div style="font-weight:600;font-size:14px">${n.title}</div>
     ${n.why && html`<div class="hint" style="margin-top:2px">${n.why}</div>`}
+    ${n.cat && newsHistory(n.cat) && html`<div class="news-hist"><${Icon} n="clock" size=${13} /> ${newsHistory(n.cat)}</div>`}
   </a>`);
 }
 export const agoStr = (d) => { const m = Math.round((Date.now() - Date.parse(d)) / 60000); return m < 60 ? `${Math.max(1, m)}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
@@ -171,15 +194,15 @@ function AlertSheet({ onClose, price }) {
   const g = s.gold;
   const [below, setBelow] = useState(g.below ? String(g.below) : '');
   const [status, setStatus] = useState(null);
-  const save = () => { patch('gold', { below: valid(below) ? parseNum(below) : null }); toast('Alerts saved', '🔔'); };
+  const save = () => { patch('gold', { below: valid(below) ? parseNum(below) : null }); toast('Alerts saved', '✓'); };
   const turnOn = async () => {
     setStatus('…');
     const r = await enablePush();
     setStatus(r);
-    if (r === 'ok') toast('Notifications on 🔔', '✅');
+    if (r === 'ok') toast('Notifications on', '✓');
   };
   const msg = { 'install-first': 'On iPhone, first add the app to your Home Screen (Share → Add to Home Screen), then open it from there and tap this again.', unsupported: 'This browser can\'t do background alerts.', denied: 'Notifications were blocked. Allow them in Settings → Notifications.', 'relay-failed': 'Saved on the phone but couldn\'t reach the alert server. I\'ll retry automatically.', '…': 'Setting up…' };
-  return html`<${Sheet} title="🔔 Gold alerts" onClose=${onClose}>${(close) => html`
+  return html`<${Sheet} title="Gold alerts" onClose=${onClose}>${(close) => html`
     <${SettingRow} title="Gold alerts" hint="Price drops & big moves"><${Switch} on=${g.alertsOn} onChange=${(v) => patch('gold', { alertsOn: v })} /><//>
     <${Field} label="Ping me when price per gram falls below">
       <${NumInput} value=${below} onInput=${setBelow} placeholder=${price ? (price * 0.98).toFixed(0) : '480'} />
@@ -187,11 +210,12 @@ function AlertSheet({ onClose, price }) {
     <//>
     <${Field} label="Also alert on a drop within 24h of"><div class="chips">${[1, 1.5, 2, 3, 5].map((d) => html`<button class=${`chip gold ${g.dropPct === d ? 'on' : ''}`} onClick=${() => patch('gold', { dropPct: d })}>${d}%</button>`)}<button class=${`chip ${!g.dropPct ? 'on' : ''}`} onClick=${() => patch('gold', { dropPct: null })}>Off</button></div><//>
     <${SettingRow} title="News alerts" hint="Big headlines that could move gold"><${Switch} on=${g.newsOn} onChange=${(v) => patch('gold', { newsOn: v })} /><//>
+    <${SettingRow} title="Early warnings" hint="Rate, dollar, stock-crash and fear spikes, plus big reports (Fed, CPI, jobs) before they happen"><${Switch} on=${g.signalsOn !== false} onChange=${(v) => patch('gold', { signalsOn: v })} /><//>
     <${Field} label="Gold goal (grams)"><${NumInput} value=${g.goalGrams ? String(g.goalGrams) : ''} onInput=${(v) => patch('gold', { goalGrams: parseNum(v) || 0 })} placeholder="e.g. 10" /><//>
     <div class="card" style="margin-top:6px">
       <b>Alerts when the app is closed</b>
       <div class="note" style="margin:6px 0 10px">${isNative() ? 'The Android app checks gold in the background about every 15 minutes.' : isIOS() ? 'On iPhone, an online helper checks gold about every 10 minutes and pings you.' : 'An online helper checks gold about every 10 minutes and pings you.'}</div>
-      <button class=${`btn block ${s.settings.alertsSetup ? '' : 'primary'}`} onClick=${turnOn}>${s.settings.alertsSetup ? '✅ Notifications on. Tap to re-check' : '🔔 Turn on notifications'}</button>
+      <button class=${`btn block ${s.settings.alertsSetup ? '' : 'primary'}`} onClick=${turnOn}>${s.settings.alertsSetup ? 'Notifications on. Tap to re-check' : 'Turn on notifications'}</button>
       ${status && status !== 'ok' && html`<div class="note warn" style="margin-top:8px">${msg[status] || status}</div>`}
     </div>
     <button class="btn primary block" style="margin-top:8px" onClick=${() => { save(); close(); }}>Save</button>
@@ -230,7 +254,7 @@ function BuySheet({ buy, price, onClose }) {
     toast(edit ? 'Updated' : `${num(grams, 2)} g gold added`, '✓');
     close();
   };
-  return html`<${Sheet} title=${edit ? 'Edit gold buy' : '🪙 ' + T.boughtGold} onClose=${onClose}>${(close) => html`
+  return html`<${Sheet} title=${edit ? 'Edit gold buy' : T.boughtGold} onClose=${onClose}>${(close) => html`
     <div class="row" style="gap:8px">
       <div style="flex:1"><${Field} label="Grams"><${NumInput} value=${g} onInput=${setG} autofocus placeholder="1" /><//></div>
       <div style="flex:1"><${Field} label="Date"><input class="input" type="date" value=${date} onInput=${(e) => setDate(e.target.value || today())} /><//></div>

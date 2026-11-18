@@ -77,7 +77,7 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                 for (i in 0 until kept.length()) { val s = kept.getJSONArray(i); if (s.getLong(0) >= now - 24 * 3600_000L) { hi = maxOf(hi, s.getDouble(1)); first = minOf(first, s.getLong(0)) } }
                 val drop = if (hi > 0) (hi - price) / hi * 100 else 0.0
                 if (now - first > 3 * 3600_000L && drop >= dropPct && now - prefs.getLong("dropAt", 0) > 6 * 3600_000L) {
-                    Notifier.send(ctx, Notifier.CH_GOLD, 102, String.format("🔥 Gold dropped %.1f%% today", drop), String.format("%.2f zł/g, down from %.2f in the last 24 hours.", price, hi), "gold")
+                    Notifier.send(ctx, Notifier.CH_GOLD, 102, String.format("Gold dropped %.1f%% today", drop), String.format("%.2f zł/g, down from %.2f in the last 24 hours.", price, hi), "gold")
                     ed.putLong("dropAt", now)
                 }
             }
@@ -99,12 +99,37 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                     val strong = n.optBoolean("gold") && n.optString("impact") != "watch" && n.optInt("strength") >= 2
                     if (fresh && strong && !sent && count < 3) {
                         val up = n.optString("impact") == "up"
-                        Notifier.send(ctx, Notifier.CH_NEWS, 200 + count, if (up) "🗞️ Hot gossip: gold may RISE ▲" else "🗞️ Hot gossip: gold may FALL ▼", n.optString("title") + "\n" + n.optString("why") + ". Stay alert 👀", "news")
+                        Notifier.send(ctx, Notifier.CH_NEWS, 200 + count, if (up) "News: gold may rise ▲" else "News: gold may fall ▼", n.optString("title") + "\n" + n.optString("why") + ".", "news")
                         sent = true; count++
                     }
                     seen.add(id)
                 }
                 ed.putInt(dayKey, count).putString("seen", seen.takeLast(200).joinToString(","))
+            } catch (_: Exception) {}
+        }
+
+        // ---- early warnings (computed every ~10 min by the online job, published in news.json) ----
+        if (gold.optBoolean("on", true) && gold.optBoolean("signals", true)) {
+            try {
+                val sigs = JSONObject(get(SITE + "news.json?t=" + now / 300_000)).optJSONArray("signals") ?: JSONArray()
+                val seen = (prefs.getString("sigSeen", "") ?: "").split(",").filter { it.isNotEmpty() }.toMutableList()
+                val dayKey = "sigCount_$today"
+                var count = prefs.getInt(dayKey, 0)
+                val awake = local.hour in 7..22
+                var sent = false
+                for (i in 0 until sigs.length()) {
+                    val x = sigs.getJSONObject(i)
+                    val id = x.optString("id")
+                    if (x.optString("level") != "high" || id in seen) continue
+                    if (awake && !sent && count < 4) {
+                        val dir = x.optString("dir")
+                        val whenMs = x.optLong("when", 0L)
+                        val whenTxt = if (whenMs > 0) java.time.format.DateTimeFormatter.ofPattern("EEE HH:mm").format(java.time.Instant.ofEpochMilli(whenMs).atZone(tz)) + " · " else ""
+                        Notifier.send(ctx, Notifier.CH_WARN, 500 + count, (if (dir == "up") "▲ " else if (dir == "down") "▼ " else "! ") + x.optString("title"), whenTxt + x.optString("body"), "gold")
+                        sent = true; count++; seen.add(id)
+                    } else if (!awake) seen.add(id) // don't deliver stale warnings in the morning
+                }
+                ed.putInt(dayKey, count).putString("sigSeen", seen.takeLast(100).joinToString(","))
             } catch (_: Exception) {}
         }
 

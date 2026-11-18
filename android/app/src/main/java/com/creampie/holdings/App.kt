@@ -18,7 +18,8 @@ class App : Application() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannels(listOf(
             NotificationChannel(Notifier.CH_GOLD, "Gold price alerts", NotificationManager.IMPORTANCE_HIGH).apply { description = "Gold below your target or big drops" },
-            NotificationChannel(Notifier.CH_NEWS, "Gold news (hot gossip)", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Headlines that could move gold" },
+            NotificationChannel(Notifier.CH_NEWS, "Gold news", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Headlines that could move gold" },
+            NotificationChannel(Notifier.CH_WARN, "Gold early warnings", NotificationManager.IMPORTANCE_HIGH).apply { description = "Rate, dollar, stock-crash and fear spikes, and big reports before they happen" },
             NotificationChannel(Notifier.CH_REMIND, "Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Card bill & 9 pm reminder" },
         ))
         schedule()

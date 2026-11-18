@@ -19,7 +19,7 @@ function config() {
   return {
     v: 1,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Warsaw',
-    gold: { on: !!s.gold.alertsOn, below: s.gold.below || null, dropPct: s.gold.dropPct || null, news: !!s.gold.newsOn },
+    gold: { on: !!s.gold.alertsOn, below: s.gold.below || null, dropPct: s.gold.dropPct || null, news: !!s.gold.newsOn, signals: s.gold.signalsOn !== false },
     remind9pm: !!s.settings.remind9pm,
     card: { on: !!(s.card.on && s.settings.cardRemind), name: s.card.name, dueDay: s.card.dueDay || 0, owed: Math.round(cardOwed(s) * 100) / 100 },
     lastEntry: s.txns.length ? s.txns.reduce((m, t) => (t.date > m ? t.date : m), '') : null,

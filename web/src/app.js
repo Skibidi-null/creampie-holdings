@@ -2,7 +2,9 @@ import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { html, Toaster, toast, sheets } from './ui.js';
 import { useStore, get, applyRecurring } from './store.js';
-import { startLive, refreshRates, alertBus, loadHistory } from './gold.js';
+import { startLive, refreshRates, alertBus, loadHistory, fetchNews } from './gold.js';
+import { startMarket, liveSignals, useMarket } from './market.js';
+import { Icon } from './icons.js';
 import { syncConfig, localNotify, isNative } from './push.js';
 import { T } from './copy.js';
 import { sha256, vibrate } from './util.js';
@@ -56,7 +58,7 @@ function Lock({ onOpen }) {
     <div class=${`dots ${bad ? 'shake' : ''}`}>${[0, 1, 2, 3, 4, 5].map((i) => html`<i class=${i < pin.length ? 'on' : ''} style=${{ opacity: i < 4 || i < pin.length ? 1 : 0.3 }}></i>`)}</div>
     <div class="pad">
       ${['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => html`<button onClick=${() => press(k)}>${k}</button>`)}
-      ${isNative() && window.CPNative.canBiometric && window.CPNative.canBiometric() ? html`<button class="k" onClick=${() => window.CPNative.biometric()}>👆</button>` : html`<span></span>`}
+      ${isNative() && window.CPNative.canBiometric && window.CPNative.canBiometric() ? html`<button class="k" onClick=${() => window.CPNative.biometric()} aria-label="Fingerprint">Touch</button>` : html`<span></span>`}
       <button onClick=${() => press('0')}>0</button>
       <button class="k" onClick=${() => press('⌫')}>⌫</button>
     </div>
@@ -65,13 +67,13 @@ function Lock({ onOpen }) {
 
 function Dock({ tab, onAdd }) {
   const go = (t) => { vibrate(6); if (route().name !== t) location.replace('#/' + t); };
-  const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i">${i}</span>${label}</button>`;
+  const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i"><${Icon} n=${i} size=${22} sw=${tab === t ? 2.1 : 1.7} /></span>${label}</button>`;
   return html`<nav class="dock">
-    ${B('home', '🏠', T.nHome)}
-    ${B('activity', '🧾', T.nActivity)}
-    <button class="plus" onClick=${onAdd} aria-label="Add">＋</button>
-    ${B('gold', '🪙', T.nGold)}
-    ${B('wealth', '📊', T.nWealth)}
+    ${B('home', 'home', T.nHome)}
+    ${B('activity', 'receipt', T.nActivity)}
+    <button class="plus" onClick=${onAdd} aria-label="Add"><${Icon} n="plus" size=${26} sw=${2.2} /></button>
+    ${B('gold', 'coin', T.nGold)}
+    ${B('wealth', 'chart', T.nWealth)}
   </nav>`;
 }
 
@@ -86,8 +88,16 @@ function App() {
     applyRecurring();
     refreshRates().then(() => startLive());
     loadHistory().catch(() => {});
+    startMarket(fetchNews);
     syncConfig();
-    const onAlert = (a) => { toast(a.text, '📉', 6000); localNotify('Gold price alert', a.text); };
+    const onAlert = (a) => { toast(a.text, '!', 6000); localNotify('Gold price alert', a.text); };
+    // new important early warnings while the app is open → banner (once each)
+    const seenW = new Set(JSON.parse(sessionStorage.getItem('cp.warn') || '[]'));
+    const warnTimer = setInterval(() => {
+      if (get().gold.signalsOn === false) return;
+      for (const w of liveSignals()) if (w.level === 'high' && !seenW.has(w.id)) { seenW.add(w.id); toast(w.title, '!', 7000); }
+      sessionStorage.setItem('cp.warn', JSON.stringify([...seenW]));
+    }, 15000);
     alertBus.add(onAlert);
     let lastHidden = 0;
     const vis = () => {
@@ -101,7 +111,7 @@ function App() {
     // Android: deep links from notifications / widget
     window.cpOpen = (where) => { if (where === 'add') setSheet({ mode: 'exp' }); else location.hash = '#/' + where; };
     if (location.hash === '#/add') { history.replaceState(null, '', '#/home'); setSheet({ mode: 'exp' }); }
-    return () => { alertBus.delete(onAlert); document.removeEventListener('visibilitychange', vis); };
+    return () => { clearInterval(warnTimer); alertBus.delete(onAlert); document.removeEventListener('visibilitychange', vis); };
   }, []);
 
   if (locked && s.settings.pin) return html`<${Lock} onOpen=${() => setLocked(false)} />`;

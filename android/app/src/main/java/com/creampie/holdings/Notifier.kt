@@ -15,6 +15,7 @@ object Notifier {
     const val CH_GOLD = "gold"
     const val CH_NEWS = "news"
     const val CH_REMIND = "remind"
+    const val CH_WARN = "warn"
 
     fun canPost(ctx: Context) = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -35,7 +36,7 @@ object Notifier {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pi)
             .setAutoCancel(true)
-            .setPriority(if (channel == CH_GOLD) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(if (channel == CH_GOLD || channel == CH_WARN) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) {}
     }
