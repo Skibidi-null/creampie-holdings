@@ -10,6 +10,9 @@ import android.webkit.JavascriptInterface
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
 
 /** Methods the web app calls as window.CPNative.xxx() */
 class Bridge(private val act: MainActivity) {
@@ -35,6 +38,42 @@ class Bridge(private val act: MainActivity) {
 
     @JavascriptInterface
     fun biometric() { act.runOnUiThread { act.showBiometric() } }
+
+    /**
+     * HTTPS request for the Trading 212 API (browsers are blocked by Trading 212's CORS rules).
+     * Only demo/live.trading212.com is allowed. Result → window.cpHttp(id, status, body).
+     */
+    @JavascriptInterface
+    fun http(id: String, method: String, url: String, auth: String, body: String) {
+        Thread {
+            var code = 0
+            var text = ""
+            try {
+                val u = URL(url)
+                val okHost = u.protocol == "https" && (u.host == "live.trading212.com" || u.host == "demo.trading212.com")
+                val okMethod = method == "GET" || method == "POST" || method == "DELETE"
+                if (!okHost || !okMethod) throw IllegalArgumentException("blocked")
+                val c = u.openConnection() as HttpURLConnection
+                c.requestMethod = method
+                c.connectTimeout = 15000; c.readTimeout = 20000
+                c.setRequestProperty("Authorization", auth)
+                c.setRequestProperty("Accept", "application/json")
+                c.setRequestProperty("User-Agent", "CreampieAndroid/1.2")
+                if (body.isNotEmpty() && method == "POST") {
+                    c.doOutput = true
+                    c.setRequestProperty("Content-Type", "application/json")
+                    c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                }
+                code = c.responseCode
+                val stream = if (code in 200..299) c.inputStream else c.errorStream
+                text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                c.disconnect()
+            } catch (e: Exception) {
+                text = if (e is IllegalArgumentException) "blocked" else (e.message ?: "network error")
+            }
+            act.runJs("window.cpHttp&&window.cpHttp(${JSONObject.quote(id)},$code,${JSONObject.quote(text)})")
+        }.start()
+    }
 
     @JavascriptInterface
     fun saveFile(name: String, mime: String, b64: String) {

@@ -37,6 +37,9 @@ class MainActivity : FragmentActivity() {
     }
     private val notifPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    /** Run JavaScript in the page (used to return native HTTP results). */
+    fun runJs(code: String) = runOnUiThread { if (::web.isInitialized) web.evaluateJavascript(code, null) }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,9 +48,9 @@ class MainActivity : FragmentActivity() {
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = false
         }
-        val root = FrameLayout(this).apply { setBackgroundColor(0xFFF4F4F1.toInt()) }
+        val root = FrameLayout(this).apply { setBackgroundColor(0xFFF5F4F0.toInt()) }
         web = WebView(this).apply {
-            setBackgroundColor(0xFFF4F4F1.toInt())
+            setBackgroundColor(0xFFF5F4F0.toInt())
             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             overScrollMode = WebView.OVER_SCROLL_NEVER
             isVerticalScrollBarEnabled = false
@@ -97,7 +100,7 @@ class MainActivity : FragmentActivity() {
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val js = "(function(){var h=(location.hash||'#/home').split('/')[1]||'home';if(history.state&&history.state.sheet)return 'back';if(['home','activity','gold','wealth'].indexOf(h)<0)return 'back';return h==='home'?'exit':'home';})()"
+                val js = "(function(){var h=(location.hash||'#/home').split('/')[1]||'home';if(history.state&&history.state.sheet)return 'back';if(['home','gold','markets','wealth'].indexOf(h)<0)return 'back';return h==='home'?'exit':'home';})()"
                 web.evaluateJavascript(js) { r ->
                     when {
                         r.contains("exit") -> finish()

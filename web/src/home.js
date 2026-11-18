@@ -86,11 +86,11 @@ export function Home({ openAdd }) {
       <${Tile} ic="card" nm=${T.card} hint=${T.cardHint} val=${s.card.limit ? html`<${Money} v=${s.card.limit - owed} />` : 'Set limit'} sub=${cp.spent > 0 ? `month pace → ${s.settings.privacy ? '••' : money(cp.projected, 'PLN', 0)}` : s.card.limit ? 'available' : ''} go="card" />
       <${Tile} ic="wallet" nm=${T.accounts} hint=${T.accountsHint} val=${html`<${Money} v=${cashTotal(s)} />`} sub=${`${s.accounts.length} places`} go="accounts" />
       <${Tile} ic="coin" tone="gold" nm=${T.nGold} hint="Your gold" val=${g.grams ? html`<${Money} v=${g.value} />` : 'No gold yet'} sub=${g.grams ? `${num(g.grams, 2)} g` : ''} go="gold" />
-      <${Tile} wide ic="chart" tone="acc" nm=${T.netWorth} hint="Everything you own minus what you owe" val=${html`<${Money} v=${nw.total} />`} sub=${'cash + gold + owed to you − debts'} go="wealth" />
+      <${Tile} ic="up" tone="acc" nm="Markets" hint="Stocks & crypto" val=${'Watchlist'} sub=${`${s.markets.list.length} watched`} go="markets" />
       <${Tile} ic="users" nm=${T.friends} hint=${T.friendsHint} val=${html`<${Money} v=${owedMe} />`} sub="owed to you" go="friends" />
+      <${Tile} wide ic="chart" tone="acc" nm=${T.netWorth} hint="Everything you own minus what you owe" val=${html`<${Money} v=${nw.total} />`} sub=${'cash + gold + owed to you − debts'} go="wealth" />
       <${Tile} ic="target" nm=${T.goals} hint=${T.goalsHint} val=${goal ? `${Math.round((goal.saved / goal.target) * 100 || 0)}%` : 'Add a goal'} sub=${goal ? goal.name : ''} go="goals" />
       <${Tile} ic="repeat" nm=${T.bills} hint=${T.billsHint} val=${bills[0] ? niceDate(bills[0].date) : 'None yet'} sub=${bills[0] ? bills[0].name : ''} go="bills" />
-      <${Tile} ic="news" nm=${T.news} hint=${T.newsHint} val=${hot ? (hot.impact === 'up' ? '▲ may rise' : hot.impact === 'down' ? '▼ may fall' : '● watch') : '…'} sub=${hot ? hot.title : ''} go="news" />
     </div>
     <div class="tiles three" style="margin-top:10px">
       <${Tile} small ic="sliders" nm="Budgets" hint="Limits" go="budget" />

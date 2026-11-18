@@ -1,0 +1,7 @@
+name = "creampie-relay"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+# No logs are kept of request contents.
+[observability]
+enabled = false

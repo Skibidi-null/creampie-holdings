@@ -22,7 +22,12 @@ export function parseQuotes(json) {
     let pct = n(q.change_pct);
     if (pct == null && prev) pct = ((last - prev) / prev) * 100;
     const t = q.last_time ? Date.parse(q.last_time.length === 10 ? q.last_time + 'T21:00:00-05:00' : q.last_time.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : null;
-    out[q.symbol] = { last, chg, pct, prev, hi52: n(q.yrhiprice), lo52: n(q.yrloprice), time: Number.isFinite(t) ? t : null, name: q.name, open: q.curmktstatus === 'REG_MKT' };
+    const x = q.ExtendedMktQuote;
+    out[q.symbol] = {
+      last, chg, pct, prev, hi52: n(q.yrhiprice), lo52: n(q.yrloprice), time: Number.isFinite(t) ? t : null, name: q.name, open: q.curmktstatus === 'REG_MKT',
+      status: q.curmktstatus || null, cur: q.currencyCode || null, pe: n(q.pe), mcap: q.mktcapView || null, vol: q.volume || null, divYield: q.dividendyield || null, eps: n(q.eps),
+      ext: x && n(x.last) != null ? { type: x.type, last: n(x.last), chg: n(x.change), pct: n(x.change_pct) } : null,
+    };
   }
   return out;
 }

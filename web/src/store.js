@@ -57,6 +57,7 @@ const blank = () => ({
   zakat: { nisab: 'gold', countOwed: true, hawl: '', other: 0, debts: 0 },
   settings: { privacy: false, pin: null, remind9pm: true, cardRemind: true, onboarded: false, alertsSetup: false },
   rates: { PLN: 1, USD: 0, EUR: 0, AED: 0, GBP: 0, INR: 0, at: 0 },
+  markets: { list: [{ sym: 'NVDA', name: 'NVIDIA' }, { sym: 'AAPL', name: 'Apple' }, { sym: 'MSFT', name: 'Microsoft' }, { sym: 'BTC-USD', name: 'Bitcoin' }, { sym: 'ETH-USD', name: 'Ethereum' }], alerts: {}, alertsOn: true },
 });
 
 function load() {
@@ -73,9 +74,11 @@ function load() {
 export function migrate(d) {
   const b = blank();
   const out = { ...b, ...d };
-  for (const k of ['card', 'gold', 'budget', 'zakat', 'settings', 'rates', 'cats']) out[k] = { ...b[k], ...(d[k] || {}) };
+  for (const k of ['card', 'gold', 'budget', 'zakat', 'settings', 'rates', 'cats', 'markets']) out[k] = { ...b[k], ...(d[k] || {}) };
   for (const k of ['accounts', 'txns', 'friends', 'recurring', 'goals']) if (!Array.isArray(out[k])) out[k] = [];
   if (!Array.isArray(out.gold.buys)) out.gold.buys = [];
+  if (!Array.isArray(out.markets.list)) out.markets.list = [];
+  if (!out.markets.alerts || typeof out.markets.alerts !== 'object') out.markets.alerts = {};
   return out;
 }
 

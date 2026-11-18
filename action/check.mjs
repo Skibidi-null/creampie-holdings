@@ -131,6 +131,18 @@ async function refreshNews() {
   return out;
 }
 
+// ---------- watchlist prices (cached per run) ----------
+const pxCache = new Map();
+async function assetPrice(sym) {
+  if (pxCache.has(sym)) return pxCache.get(sym);
+  let v = null;
+  try {
+    if (/^[A-Z0-9]+-USD$/.test(sym)) v = +(await (await fetch(`https://api.exchange.coinbase.com/products/${sym}/ticker`, { headers: { 'User-Agent': 'Mozilla/5.0' } })).json()).price || null;
+    else { const q = parseQuotes(await (await fetch(QUOTE_URL([sym]), { headers: { 'User-Agent': 'Mozilla/5.0' } })).json())[sym]; v = q ? (q.ext && q.status !== 'REG_MKT' ? q.ext.last : q.last) : null; }
+  } catch (e) { log('price failed', sym, e.message); }
+  pxCache.set(sym, v); return v;
+}
+
 // ---------- local time helpers ----------
 function local(tz) {
   const f = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -242,6 +254,21 @@ for (const [id, dev] of Object.entries(state.devices)) {
     // quiet hours: mark as seen anyway so old warnings don't arrive in the morning
     for (const x of (L.hour >= 7 && L.hour < 23 ? fresh.slice(0, 1) : fresh)) f.sig.push(x.id);
     f.sig = f.sig.slice(-100);
+  }
+  // watchlist price alerts (stocks via CNBC, crypto via Coinbase)
+  const mk = c.markets || {};
+  if (mk.on !== false && Array.isArray(mk.alerts) && mk.alerts.length) {
+    f.wa ||= {};
+    for (const al of mk.alerts) {
+      const px = await assetPrice(al.sym);
+      if (px == null) continue;
+      const k = al.sym; const st = (f.wa[k] ||= {});
+      const fmt = (v) => (v >= 1 ? v.toFixed(2) : v.toPrecision(4));
+      if (al.above && px >= al.above && !st.a) { sends.push({ title: `${al.name} is above ${fmt(al.above)}`, body: `Now ${fmt(px)}. Your price alert.`, url: APP_URL + '#/asset/' + encodeURIComponent(al.sym), tag: 'pa-' + k }); st.a = 1; }
+      if (al.above && px < al.above * 0.995) st.a = 0;
+      if (al.below && px <= al.below && !st.b) { sends.push({ title: `${al.name} dropped below ${fmt(al.below)}`, body: `Now ${fmt(px)}. Your price alert.`, url: APP_URL + '#/asset/' + encodeURIComponent(al.sym), tag: 'pb-' + k }); st.b = 1; }
+      if (al.below && px > al.below * 1.005) st.b = 0;
+    }
   }
   const card = c.card || {};
   if (card.on && card.dueDay && card.owed > 0 && L.hour >= 9 && L.hour < 21) {

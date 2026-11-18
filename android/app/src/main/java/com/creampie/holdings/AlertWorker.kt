@@ -25,6 +25,25 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
         return c.inputStream.bufferedReader().use { it.readText() }
     }
 
+    /** Latest price: crypto (XXX-USD) from Coinbase, everything else from CNBC (incl. pre/after-hours). */
+    private fun assetPrice(sym: String): Double? = try {
+        if (Regex("^[A-Z0-9]+-USD$").matches(sym)) JSONObject(get("https://api.exchange.coinbase.com/products/$sym/ticker")).getString("price").toDouble()
+        else {
+            val u = "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=" + java.net.URLEncoder.encode(sym, "UTF-8") + "&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json"
+            val q = JSONObject(getUA(u, "Mozilla/5.0 (Linux; Android 14) Mobile")).getJSONObject("FormattedQuoteResult").getJSONArray("FormattedQuote").getJSONObject(0)
+            val ext = q.optJSONObject("ExtendedMktQuote")
+            val raw = if (ext != null && q.optString("curmktstatus") != "REG_MKT") ext.optString("last") else q.optString("last")
+            raw.replace(",", "").replace("%", "").toDoubleOrNull()
+        }
+    } catch (_: Exception) { null }
+
+    private fun getUA(url: String, ua: String): String {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.connectTimeout = 10000; c.readTimeout = 10000
+        c.setRequestProperty("User-Agent", ua)
+        return c.inputStream.bufferedReader().use { it.readText() }
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val ctx = applicationContext
         val prefs = Store.prefs(ctx)
@@ -131,6 +150,29 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                 }
                 ed.putInt(dayKey, count).putString("sigSeen", seen.takeLast(100).joinToString(","))
             } catch (_: Exception) {}
+        }
+
+        // ---- watchlist price alerts ----
+        val mk = cfg.optJSONObject("markets")
+        val als = mk?.optJSONArray("alerts")
+        if (mk != null && mk.optBoolean("on", true) && als != null && als.length() > 0) {
+            val wa = try { JSONObject(prefs.getString("wa", "{}")) } catch (_: Exception) { JSONObject() }
+            var n = 0
+            for (i in 0 until als.length()) {
+                val al = als.getJSONObject(i)
+                val sym = al.optString("sym"); val name = al.optString("name", sym)
+                val above = al.optDouble("above", 0.0).let { if (it.isNaN()) 0.0 else it }
+                val below = al.optDouble("below", 0.0).let { if (it.isNaN()) 0.0 else it }
+                val px = assetPrice(sym) ?: continue
+                val st = wa.optJSONObject(sym) ?: JSONObject()
+                fun f(v: Double) = if (v >= 1) String.format("%.2f", v) else String.format("%.6f", v)
+                if (above > 0 && px >= above && !st.optBoolean("a")) { Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 40), "$name is above ${f(above)}", "Now ${f(px)}. Your price alert.", "asset/" + java.net.URLEncoder.encode(sym, "UTF-8")); st.put("a", true) }
+                if (above > 0 && px < above * 0.995) st.put("a", false)
+                if (below > 0 && px <= below && !st.optBoolean("b")) { Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 40), "$name dropped below ${f(below)}", "Now ${f(px)}. Your price alert.", "asset/" + java.net.URLEncoder.encode(sym, "UTF-8")); st.put("b", true) }
+                if (below > 0 && px > below * 1.005) st.put("b", false)
+                wa.put(sym, st)
+            }
+            ed.putString("wa", wa.toString())
         }
 
         // ---- credit card bill ----

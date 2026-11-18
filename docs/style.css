@@ -336,3 +336,24 @@ a { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .tile-ic-lg { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex: none; background: var(--gold-soft); color: var(--gold); }
+
+/* markets */
+.idx { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.idx-i { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 8px; text-align: left; color: var(--text); box-shadow: var(--shadow); min-width: 0; }
+.idx-i .hint { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idx-v { font-weight: 700; font-size: 14px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idx-c { font-size: 12px; font-weight: 600; }
+.big-num { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.wrow { cursor: pointer; }
+.iconbtn.sm { width: 32px; height: 32px; font-size: 14px; box-shadow: none; }
+.chg { display: inline-block; font-size: 12px; font-weight: 650; padding: 2px 7px; border-radius: 7px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.chg.up { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+.chg.down { color: var(--down); background: color-mix(in srgb, var(--down) 12%, transparent); }
+.range52 { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.bar52 { position: relative; flex: 1; height: 6px; border-radius: 9px; background: linear-gradient(90deg, var(--up), var(--gold), var(--down)); opacity: .8; }
+.bar52 i { position: absolute; top: -4px; width: 4px; height: 14px; border-radius: 3px; background: var(--text); transform: translateX(-50%); }
+.envbar { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .05em; padding: 7px; border-radius: 10px; margin-bottom: 12px; background: var(--accent-soft); color: var(--accent); }
+.envbar.live { background: color-mix(in srgb, var(--down) 14%, transparent); color: var(--down); }
+.btn.danger-fill { background: var(--down); border-color: var(--down); color: #fff; }
+.tile-ic-lg.acc { background: var(--accent-soft); color: var(--accent); }
+a.btn { text-decoration: none; }

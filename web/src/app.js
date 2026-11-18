@@ -16,8 +16,10 @@ import { Wealth, Accounts, Card, Friends, Goals } from './wealth.js';
 import { Budget, Bills, HistoryScreen, Summary } from './plan.js';
 import { Zakat, Convert, Backup, Settings, Setup } from './more.js';
 import { Back } from './ui.js';
+import { Markets, Asset, Portfolio, Broker } from './marketsScreen.js';
+import { startAssets, assetAlertBus } from './assets.js';
 
-const TABS = ['home', 'activity', 'gold', 'wealth'];
+const TABS = ['home', 'gold', 'markets', 'wealth'];
 const route = () => { const parts = (location.hash.replace(/^#\/?/, '') || 'home').split('/'); return { name: parts[0], arg: parts[1] }; };
 
 function useRoute() {
@@ -70,9 +72,9 @@ function Dock({ tab, onAdd }) {
   const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i"><${Icon} n=${i} size=${22} sw=${tab === t ? 2.1 : 1.7} /></span>${label}</button>`;
   return html`<nav class="dock">
     ${B('home', 'home', T.nHome)}
-    ${B('activity', 'receipt', T.nActivity)}
-    <button class="plus" onClick=${onAdd} aria-label="Add"><${Icon} n="plus" size=${26} sw=${2.2} /></button>
     ${B('gold', 'coin', T.nGold)}
+    <button class="plus" onClick=${onAdd} aria-label="Add"><${Icon} n="plus" size=${26} sw=${2.2} /></button>
+    ${B('markets', 'up', 'Markets')}
     ${B('wealth', 'chart', T.nWealth)}
   </nav>`;
 }
@@ -89,6 +91,9 @@ function App() {
     refreshRates().then(() => startLive());
     loadHistory().catch(() => {});
     startMarket(fetchNews);
+    startAssets();
+    const onAsset = (text) => { toast(text, '!', 6000); localNotify('Price alert', text); };
+    assetAlertBus.add(onAsset);
     syncConfig();
     const onAlert = (a) => { toast(a.text, '!', 6000); localNotify('Gold price alert', a.text); };
     // new important early warnings while the app is open → banner (once each)
@@ -111,7 +116,7 @@ function App() {
     // Android: deep links from notifications / widget
     window.cpOpen = (where) => { if (where === 'add') setSheet({ mode: 'exp' }); else location.hash = '#/' + where; };
     if (location.hash === '#/add') { history.replaceState(null, '', '#/home'); setSheet({ mode: 'exp' }); }
-    return () => { clearInterval(warnTimer); alertBus.delete(onAlert); document.removeEventListener('visibilitychange', vis); };
+    return () => { assetAlertBus.delete(onAsset); clearInterval(warnTimer); alertBus.delete(onAlert); document.removeEventListener('visibilitychange', vis); };
   }, []);
 
   if (locked && s.settings.pin) return html`<${Lock} onOpen=${() => setLocked(false)} />`;
@@ -124,6 +129,10 @@ function App() {
     gold: () => html`<${GoldScreen} />`,
     wealth: () => html`<${Wealth} />`,
     news: () => html`<div class="screen"><${Back} title=${T.news} hint="Gold news & what it might mean" onBack=${() => history.back()} /><${NewsScreen} /></div>`,
+    markets: () => html`<${Markets} />`,
+    asset: () => html`<${Asset} sym=${decodeURIComponent(r.arg || '')} key=${r.arg} />`,
+    portfolio: () => html`<${Portfolio} />`,
+    broker: () => html`<${Broker} />`,
     accounts: () => html`<${Accounts} />`,
     card: () => html`<${Card} />`,
     friends: () => html`<${Friends} />`,
