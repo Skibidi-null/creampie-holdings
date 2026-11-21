@@ -96,3 +96,10 @@ Brief: notes/BRIEF-v2.md (incl. user answers + locked additions at the bottom).
 - 21 Nov 06:05: APK 2.0 published (docs/android). Updater tested end-to-end on note8 emu (auto + manual check, download, sha, permission, install). Widgets tested via temp WidgetLab on note8 (all 8, several sizes). S21 api35 emulator crashes host-side (qemu segfault, 'Failed to find ColorBuffer') ~45s after the WebView app opens; idle is stable -> emulator GPU bug. Old WebView 69 support added (polyfills, inset). Next: LineChart->LWC, gold zł strings -> currency, worker run test.
 - T212: tools/t212mock.mjs (faithful mock per official docs) + tools/t212test.mjs: 16/16 PASS (connect errors, demo connect, badge, live needs guard, positions, pies, history pagination, market+limit orders, cancel, oversell, missing scope 403, fees).
 - 06:30 sheets-above-dock fix pushed. e2e.mjs 64/65 (expense step needed a category; test fixed). Next: Note8 1.2->2.0 upgrade + PIN, alert firing, S21 retry, final screens.
+
+## v2.0 state (21 Nov, end of build)
+- Web: all phases done. e2e 65/65 (tools/e2e.mjs), T212 mock test 16/16. Screens in notes/screens-v2/ (sample data).
+- Android 2.0 (versionCode 4) published in docs/android. Tested on note8_api28: app, widgets (all 8, sizes 60..320dp), updater (auto+manual, sha, permission, install), upgrade 1.2 -> 2.0 keeps data (PIN + settings).
+- S21 api35 emulator: host GPU crash (qemu segfault) ~45 s after the WebView app opens, even with blur effects removed; idle emulator is stable. Home screenshot taken before the crash looked right. Needs a check on a real phone.
+- Old WebView (Chrome 69) supported via polyfills; flex gap missing there (spacing tighter) but usable.
+- Known limits: earnings/insiders/13F come from the online job (macro.json, 6 h); calendar "actual" not in the free feed; UAE central bank rate has no free feed; dividend dates not in free data.
