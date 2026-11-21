@@ -6,7 +6,7 @@ import { useMarket, drivers, outlook, liveSignals, spark, zlotyEffect, playbook 
 import { eventPlaybook } from './signals.js';
 import { num } from './util.js';
 
-const sign = (v, d = 2) => { if (v == null || !Number.isFinite(v)) return '—'; const r = Math.abs(v).toFixed(d); return (+r === 0 ? '' : v > 0 ? '+' : '−') + r; };
+const sign = (v, d = 2) => { if (v == null || !Number.isFinite(v)) return '-'; const r = Math.abs(v).toFixed(d); return (+r === 0 ? '' : v > 0 ? '+' : '−') + r; };
 const effTxt = (e) => (e >= 2 ? 'Strong push up' : e === 1 ? 'Pushing up' : e === -1 ? 'Pushing down' : e <= -2 ? 'Strong push down' : 'Neutral');
 const effCls = (e) => (e > 0 ? 'up' : e < 0 ? 'down' : 'flat');
 const localTime = (t) => new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -35,14 +35,14 @@ export function OutlookCard({ price, compact }) {
   const Row = ({ t, v }) => html`<div class="ol-row">
     <div class="ol-h"><span class="hint">${t}</span><span class=${`pill-dir ${v.dir}`}><${Icon} n=${v.dir === 'up' ? 'up' : v.dir === 'down' ? 'down' : 'flat'} size=${15} sw=${2.2} />${v.label}</span></div>
     <div class="meter"><i style=${{ left: `${Math.max(3, Math.min(97, 50 + v.score * 50))}%` }}></i></div>
-    ${v.range && html`<div class="ol-range">Likely range: <b class="mono">${num(v.range.lo)} – ${num(v.range.hi)} zł/g</b> <span class="hint">(about 2 in 3 chance)</span></div>`}
+    ${v.range && html`<div class="ol-range">Likely range: <b class="mono">${num(v.range.lo)} to ${num(v.range.hi)} zł/g</b> <span class="hint">(about 2 in 3 chance)</span></div>`}
     <div class="hint">Confidence: ${v.confLabel}${v.top.length ? ' · Main reasons: ' + v.top.map((d) => `${d.name.toLowerCase()} (${effTxt(v === o.days ? d.fx : d.fm).toLowerCase()})`).join(', ') : ''}</div>
   </div>`;
   return html`<div class="card">
     <div class="row between"><b>Gold outlook</b><span class="hint">from ${ds.length} live factors</span></div>
     <${Row} t="Next few days" v=${o.days} />
     <div class="sep"></div>
-    <${Row} t="Next 1–3 months" v=${o.weeks} />
+    <${Row} t="Next 1 to 3 months" v=${o.weeks} />
     ${!compact && html`<div class="note" style="margin-top:10px">This is a rough lean, not a promise. It adds up the factors below that historically move gold. Nobody can predict gold reliably: a surprise headline can flip it within minutes.</div>`}
   </div>`;
 }
@@ -71,7 +71,7 @@ export function Drivers() {
   const z = zlotyEffect();
   const [open, setOpen] = useState(null);
   const age = m.qAt ? Math.round((Date.now() - m.qAt) / 1000) : null;
-  const ch = (d, v) => (v == null ? '—' : d.kind === 'pt' ? sign(v) + ' pt' : sign(v, 1) + '%');
+  const ch = (d, v) => (v == null ? '-' : d.kind === 'pt' ? sign(v) + ' pt' : sign(v, 1) + '%');
   return html`<div>
     <div class="hint" style="margin:0 4px 10px"><span class=${`livedot ${m.err ? 'off' : ''}`}></span>${m.err ? 'Offline, showing last data' : `Live · updated ${age != null ? age + 's' : '…'} ago · refreshes every 5 seconds`}</div>
     ${ds.map((d) => html`<div class="card drv" onClick=${() => setOpen(open === d.key ? null : d.key)}>
@@ -176,7 +176,7 @@ export function HistoryLessons() {
       ${PB.stocks.crash.slice().reverse().map((c) => html`<div class="hrow">
         <div class="grow">${f(c.m)} <span class="hint">${sign(c.spx, 1)}%</span></div>
         <div class="hcell"><b class=${c.gold >= 0 ? 'up' : 'down'}>${sign(c.gold, 1)}%</b></div>
-        <div class="hcell"><b class=${c.next12 == null ? '' : c.next12 >= 0 ? 'up' : 'down'}>${c.next12 == null ? '—' : sign(c.next12, 1) + '%'}</b></div>
+        <div class="hcell"><b class=${c.next12 == null ? '' : c.next12 >= 0 ? 'up' : 'down'}>${c.next12 == null ? '-' : sign(c.next12, 1) + '%'}</b></div>
       </div>`)}
       ${(() => { const r = PB.stocks.crash.filter((c) => c.m >= '2000' && c.next12 != null); return html`<div class="note" style="margin-top:8px">Since 2000, gold was higher a year later in ${r.filter((c) => c.next12 > 0).length} of ${r.length} of these crash months. The worst moments (Oct 2008, Mar 2020) included a fast dip as traders sold gold to cover losses.</div>`; })()}
     </div>

@@ -218,7 +218,7 @@ export function setAlert(sym, a) {
 
 export const curSign = (sym) => { if (/=$/.test(sym) || /^US\d+Y/.test(sym)) return ''; const q = A.q[sym]; const c = isCrypto(sym) ? 'USD' : (q && q.cur) || 'USD'; return c === 'USD' ? '$' : c === 'EUR' ? '€' : c === 'GBP' ? '£' : c === 'PLN' ? 'zł ' : ''; };
 export const fmtPrice = (v, sym, dec = null) => {
-  if (v == null || !Number.isFinite(v)) return '—';
+  if (v == null || !Number.isFinite(v)) return '-';
   const idx = sym && sym.startsWith('.');
   const d = dec != null ? dec : v >= 1 ? 2 : v >= 0.01 ? 4 : 8;
   return (idx ? '' : curSign(sym)) + v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });

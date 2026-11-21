@@ -111,7 +111,7 @@ function BillSheet({ r, onClose }) {
   const ok = name.trim() && valid(amt) && d >= 1 && d <= 31;
   return html`<${Sheet} title=${r.id ? 'Edit bill' : 'New repeating bill'} onClose=${onClose}>${(close) => html`
     <${Field} label="Name"><input class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Rent, Play, Netflix, Gym…" /><//>
-    <div class="row" style="gap:8px"><div class="grow"><${Field} label="Amount"><${NumInput} value=${amt} onInput=${setAmt} /><//></div><div style="flex:0 0 40%"><${Field} label="Day of month"><${NumInput} value=${day} onInput=${setDay} placeholder="1–31" /><//></div></div>
+    <div class="row" style="gap:8px"><div class="grow"><${Field} label="Amount"><${NumInput} value=${amt} onInput=${setAmt} /><//></div><div style="flex:0 0 40%"><${Field} label="Day of month"><${NumInput} value=${day} onInput=${setDay} placeholder="1 to 31" /><//></div></div>
     <${Field} label="Category"><div class="chips">${s.cats.exp.map((c) => html`<button class=${`chip ${cat === c.id ? 'on' : ''}`} onClick=${() => setCat(c.id)}>${c.icon} ${c.name}</button>`)}</div><//>
     <${Field} label="Paid with"><div class="chips">
       ${s.accounts.map((a) => html`<button class=${`chip ${from === a.id ? 'on' : ''}`} onClick=${() => setFrom(a.id)}>${a.icon} ${a.name}</button>`)}
@@ -182,7 +182,7 @@ export function Summary({ ym: ym0 }) {
     <div class="card" style="margin-top:12px"><div class="kv">
       <span>Daily average</span><${Money} v=${ms.spend / days} />
       <span>No-spend days</span><span>${noSpend} / ${days}</span>
-      <span>Biggest expense</span><span>${biggest ? html`<${Money} v=${txnPln(s, biggest)} /> <span class="hint">${catOf(s, biggest.cat).icon}</span>` : '—'}</span>
+      <span>Biggest expense</span><span>${biggest ? html`<${Money} v=${txnPln(s, biggest)} /> <span class="hint">${catOf(s, biggest.cat).icon}</span>` : '-'}</span>
       <span>On the card</span><${Money} v=${ms.card} />
     </div></div>
     ${top.length > 0 && html`<div class="sect"><span class="h-title">Top 3 categories</span></div>

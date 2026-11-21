@@ -32,7 +32,7 @@ export function Gauge({ score, size = 76, label, stroke = 7 }) {
       <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke="rgba(255,255,255,.08)" stroke-width=${stroke} stroke-linecap="round" stroke-dasharray=${`${arc} ${c}`} />
       <circle class="arc" cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke=${score != null && v < 41 ? '#FF5C8A' : `url(#${id})`} stroke-width=${stroke} stroke-linecap="round" stroke-dasharray=${`${arc} ${c}`} stroke-dashoffset=${arc * (1 - v / 100)} />
     </svg>
-    <div class="gv"><b style=${{ fontSize: size * 0.29 + 'px' }}>${score == null ? '–' : Math.round(v)}</b>${size >= 60 && html`<span style=${{ color: col }}>${lbl.toUpperCase()}</span>`}</div>
+    <div class="gv"><b style=${{ fontSize: size * 0.29 + 'px' }}>${score == null ? '-' : Math.round(v)}</b>${size >= 60 && html`<span style=${{ color: col }}>${lbl.toUpperCase()}</span>`}</div>
   </div>`;
 }
 

@@ -155,10 +155,10 @@ export function drivers(newsItems) {
     const gap = v != null && mid != null ? v - mid : null;
     const fmv = (gap == null ? 0 : gap <= -0.5 ? 2 : gap <= -0.2 ? 1 : gap >= 0.5 ? -2 : gap >= 0.2 ? -1 : 0);
     const last = fed && fed.moves.length ? fed.moves.at(-1) : null;
-    out.push({ key: 'fed', name: 'Fed interest rate', sub: fed ? `Fed rate ${fed.lo.toFixed(2)}–${fed.hi.toFixed(2)}% · 2-yr yield ${v != null ? v.toFixed(2) + '%' : '…'}` : 'US 2-year yield', sym: s, v, unit: '%', d: q[s] && q[s].chg, w: w && w.abs, m: m && m.abs, kind: 'pt',
+    out.push({ key: 'fed', name: 'Fed interest rate', sub: fed ? `Fed rate ${fed.lo.toFixed(2)} to ${fed.hi.toFixed(2)}% · 2-yr yield ${v != null ? v.toFixed(2) + '%' : '…'}` : 'US 2-year yield', sym: s, v, unit: '%', d: q[s] && q[s].chg, w: w && w.abs, m: m && m.abs, kind: 'pt',
       fx: -sgn(w && w.abs, 0.1), fm: clamp(fmv - sgn(m && m.abs, 0.25), -2, 2), weight: 1.5,
       now: gap == null ? '' : gap <= -0.2 ? `Traders expect rate CUTS ahead (2-yr yield ${Math.abs(gap).toFixed(2)} below the Fed rate). Good for gold.` : gap >= 0.2 ? `Traders expect more rate HIKES (2-yr yield ${gap.toFixed(2)} above the Fed rate). Bad for gold.` : 'Traders expect rates to stay about the same.',
-      extra: last ? `Last Fed move: ${last.to[1] > last.from[1] ? 'HIKE' : 'CUT'} on ${last.date} (${last.from[0].toFixed(2)}–${last.from[1].toFixed(2)}% → ${last.to[0].toFixed(2)}–${last.to[1].toFixed(2)}%)` : '',
+      extra: last ? `Last Fed move: ${last.to[1] > last.from[1] ? 'HIKE' : 'CUT'} on ${last.date} (${last.from[0].toFixed(2)} to ${last.from[1].toFixed(2)}% → ${last.to[0].toFixed(2)} to ${last.to[1].toFixed(2)}%)` : '',
       why: 'The Fed sets US interest rates. Cuts make holding gold cheaper and weaken the dollar, so gold usually rises. Hikes do the opposite. Markets move BEFORE the Fed acts, so what traders expect matters more than the decision itself.',
       hist: `Since 1971, after the FIRST cut of a cutting cycle (${P.fed.firstCut.n} times), gold was higher 6 months later in ${P.fed.firstCut.h6.up}% of cases (avg +${P.fed.firstCut.h6.avg}%). Hikes alone did not always sink gold: what matters is whether rates rise faster than inflation (real rates, above).` });
   }
@@ -223,7 +223,7 @@ export function drivers(newsItems) {
   }
   // 9. Central banks (slow, structural)
   out.push({ key: 'cb', name: 'Central bank buying', sub: 'China, Poland, India, Turkey and others', kind: 'none', fx: 0, fm: 1, weight: 0.5,
-    now: 'Central banks bought over 1,000 tonnes a year in 2022–2024, about double the 2010s average, and kept buying since. This steady demand kept gold high even when real rates rose.',
+    now: 'Central banks bought over 1,000 tonnes a year in 2022 to 2024, about double the 2010s average, and kept buying since. This steady demand kept gold high even when real rates rose.',
     why: 'Central banks buy gold to depend less on the dollar (especially after Russia\'s reserves were frozen in 2022). Their buying is slow, but it puts a floor under the price. Poland\'s central bank (NBP) is one of the biggest buyers.', hist: '' });
   return out;
 }

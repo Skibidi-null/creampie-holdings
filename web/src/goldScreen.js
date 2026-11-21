@@ -98,7 +98,7 @@ export function GoldScreen() {
           <span>You paid in total</span><${Money} v=${g.paid} />
           <span>Avg you paid / g</span><${Money} v=${g.avgPaid} />
           <span>Avg market price / g at purchase</span><${Money} v=${g.avgMarket} />
-          <span>Avg shop premium</span><span>${g.avgPremium != null ? num(g.avgPremium * 100, 1) + '%' : '—'}</span>
+          <span>Avg shop premium</span><span>${g.avgPremium != null ? num(g.avgPremium * 100, 1) + '%' : '-'}</span>
           <span>Profit / loss vs what you paid</span><${Money} v=${g.pl} sign cls=${g.pl >= 0 ? 'up' : 'down'} />
           <span>If you sold back (~${s.gold.sellSpread}% below spot)</span><${Money} v=${g.value * (1 - s.gold.sellSpread / 100) - g.paid} sign cls=${g.value * (1 - s.gold.sellSpread / 100) - g.paid >= 0 ? 'up' : 'down'} />
         </div>
@@ -110,7 +110,7 @@ export function GoldScreen() {
         const now = p ? (p - b.paid) / b.paid * 100 : 0;
         return html`<button class="item" onClick=${() => setSheet({ buy: b })}>
           <span class="em gold"><${Icon} n="coin" size=${19} /></span>
-          <div class="grow"><div class="t1">${num(b.g, 2)} g at ${num(b.paid)} zł/g</div><div class="t2">${niceDate(b.date)} · market was ${num(b.market || 0)} · premium ${b.market ? num(((b.paid - b.market) / b.market) * 100, 1) + '%' : '—'}</div></div>
+          <div class="grow"><div class="t1">${num(b.g, 2)} g at ${num(b.paid)} zł/g</div><div class="t2">${niceDate(b.date)} · market was ${num(b.market || 0)} · premium ${b.market ? num(((b.paid - b.market) / b.market) * 100, 1) + '%' : '-'}</div></div>
           <span class=${`amt mono ${now >= 0 ? 'up' : 'down'}`}>${pct(now)}</span>
         </button>`;
       })}

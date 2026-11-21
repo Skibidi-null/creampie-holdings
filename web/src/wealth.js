@@ -129,9 +129,9 @@ export function Card() {
     <${Projection} s=${s} onSetTarget=${() => setEdit(true)} />
 
     <div class="stat3" style="margin-top:12px">
-      <div><div class="l">Bill due</div><div class="v">${due ? niceDate(due) : '—'}</div><div class="d">${due ? `in ${daysBetween(today(), due)} days` : 'set a day'}</div></div>
+      <div><div class="l">Bill due</div><div class="v">${due ? niceDate(due) : '-'}</div><div class="d">${due ? `in ${daysBetween(today(), due)} days` : 'set a day'}</div></div>
       <div><div class="l">To pay</div><div class="v"><${Money} v=${Math.max(0, owed)} d=${0} /></div><div class="d">full amount</div></div>
-      <div><div class="l">Used</div><div class="v">${c.limit ? Math.round(used * 100) + '%' : '—'}</div><div class="d">of limit</div></div>
+      <div><div class="l">Used</div><div class="v">${c.limit ? Math.round(used * 100) + '%' : '-'}</div><div class="d">of limit</div></div>
     </div>
     <button class="btn primary block" style="margin-top:12px" disabled=${owed <= 0} onClick=${() => sheets.open({ mode: 'xfer', preset: { to: CARD, amt: +owed.toFixed(2) } })}>Pay the card bill</button>
     <div class="note" style="padding:8px 6px">Paying the bill moves money from your bank to the card. It isn't counted as spending again, because each purchase already was.</div>
@@ -154,7 +154,7 @@ export function Projection({ s, onSetTarget }) {
     <div class="hint">expected card spending by ${p.dim} ${monthShort}</div>
     <${PaceChart} p=${p} />
     <div class="kv" style="margin-top:6px">
-      <span>Spent on card (1–${p.day} ${monthShort})</span><${Money} v=${p.spent} />
+      <span>Spent on card (1 to ${p.day} ${monthShort})</span><${Money} v=${p.spent} />
       <span>Daily average (÷ ${p.day} day${p.day === 1 ? '' : 's'})</span><${Money} v=${p.perDay} />
       <span>Days left in month</span><span>${p.daysLeft}</span>
       <span>Expected in remaining days</span><${Money} v=${p.extra} />

@@ -141,7 +141,7 @@ function Mini({ sym, nm, q }) {
   const up = q && q.pct >= 0;
   return html`<button class="mini" onClick=${() => nav('asset/' + encodeURIComponent(sym))}>
     <div class="n">${nm}</div>
-    <div class=${`p ${q ? (up ? 'up' : 'down') : 'mute'}`}>${q && q.pct != null ? pct(q.pct, 2) : '–'}</div>
+    <div class=${`p ${q ? (up ? 'up' : 'down') : 'mute'}`}>${q && q.pct != null ? pct(q.pct, 2) : '-'}</div>
     <${Spark} pts=${pts} w=${90} h=${22} color=${q ? (up ? '#3CFFB4' : '#FF5C8A') : undefined} />
   </button>`;
 }

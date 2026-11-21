@@ -14,8 +14,8 @@ import { T212, T212C } from './t212.js';
 import { addJournal } from './invest.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '–' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
-const usd = (v) => (v == null ? '–' : `${v < 0 ? '−' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '-' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
+const usd = (v) => (v == null ? '-' : `${v < 0 ? '−' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 // paper prices are in each asset's own quote currency; the practice account counts everything in USD
 // (non-USD quotes are converted with live FX where available)
 const toUsd = (sym, px) => { const q = A.q[sym]; const c = (q && q.cur) || 'USD'; if (c === 'USD' || /-USD$/.test(sym)) return px; const r = get().rates; return r[c] && r.USD ? (px * r[c]) / r.USD : px; };
@@ -65,7 +65,7 @@ export function Practice({ arg }) {
     </div></div></div>
     <div class="sect"><span class="h-title">Positions</span></div>
     <div class="card" style="padding:4px 14px">${P.pos.length ? P.pos.map((p) => { const q = a.q[p.sym]; const px = q ? toUsd(p.sym, q.last) : null; const pl = px != null ? ((px - p.avg) / p.avg) * 100 : null;
-      return html`<button class="item" onClick=${() => setSheet({ sym: p.sym, side: 'SELL' })}><span class="em sym">${nameOf(p.sym).slice(0, 4).toUpperCase()}</span><div class="grow"><div class="t1">${nameOf(p.sym)}</div><div class="t2">${num(p.qty, 4)} × avg ${usd(p.avg)}</div></div><div style="text-align:right"><div class="amt">${px != null ? usd(px * p.qty) : '–'}</div><span class=${`chg ${pl >= 0 ? 'up' : 'down'}`}>${pctS(pl)}</span></div></button>`; }) : html`<div class="empty">No positions. Tap + to make a practice trade.</div>`}</div>
+      return html`<button class="item" onClick=${() => setSheet({ sym: p.sym, side: 'SELL' })}><span class="em sym">${nameOf(p.sym).slice(0, 4).toUpperCase()}</span><div class="grow"><div class="t1">${nameOf(p.sym)}</div><div class="t2">${num(p.qty, 4)} × avg ${usd(p.avg)}</div></div><div style="text-align:right"><div class="amt">${px != null ? usd(px * p.qty) : '-'}</div><span class=${`chg ${pl >= 0 ? 'up' : 'down'}`}>${pctS(pl)}</span></div></button>`; }) : html`<div class="empty">No positions. Tap + to make a practice trade.</div>`}</div>
     ${(P.orders || []).length > 0 && html`<div class="sect"><span class="h-title">Waiting orders</span></div><div class="card" style="padding:4px 14px">${P.orders.map((o) => html`<div class="item"><div class="grow"><div class="t1">${o.side} ${num(o.qty, 4)} ${nameOf(o.sym)}</div><div class="t2">${o.type.toLowerCase()} at ${fmtPrice(o.px, o.sym)}</div></div><button class="btn sm danger" onClick=${() => set((x) => ({ ...x, paper: { ...x.paper, orders: x.paper.orders.filter((y) => y.id !== o.id) } }))}>Cancel</button></div>`)}</div>`}
     ${P.trades.length > 0 && html`<div class="sect"><span class="h-title">History</span></div><div class="card" style="padding:4px 14px">${[...P.trades].reverse().slice(0, 15).map((t) => html`<div class="item"><span class=${`chg ${t.side === 'BUY' ? 'up' : 'down'}`}>${t.side}</span><div class="grow"><div class="t1">${nameOf(t.sym)}</div><div class="t2">${num(t.qty, 4)} @ ${usd(t.px)} · ${new Date(t.t).toLocaleString()}</div></div>${t.pl != null && html`<span class=${`mono ${t.pl >= 0 ? 'up' : 'down'}`}>${usd(t.pl)}</span>`}</div>`)}</div>`}
     <div class="btns" style="margin-top:10px"><button class="btn holo" onClick=${() => setSheet({})}><${Icon} n="plus" size=${17} /> New practice trade</button>
@@ -101,7 +101,7 @@ function PaperSheet({ sym0, side0, onClose }) {
       ${type !== 'MARKET' && html`<${Field} label=${`${type === 'LIMIT' ? 'Limit' : 'Stop'} price`}><${NumInput} value=${lim} onInput=${setLim} placeholder=${px != null ? String(px) : ''} /><//>`}
       <${Field} label="Amount (USD)"><${NumInput} value=${amt} onInput=${setAmt} placeholder="1000" autofocus />
         <div class="chips" style="margin-top:8px">${side === 'BUY' ? [500, 1000, 5000, 10000].map((x) => html`<button class="chip mono" onClick=${() => setAmt(String(x))}>$${x.toLocaleString('en-US')}</button>`) : pos && html`<button class="chip" onClick=${() => setAmt(String((pos.qty * pxU).toFixed(2)))}>All (${num(pos.qty, 4)})</button>`}</div><//>
-      <div class="kv" style="margin-bottom:12px"><span>Units</span><span>${qty ? num(qty, 6) : '–'}</span><span>Practice cash</span><span>${usd(s.paper.cash)}</span></div>
+      <div class="kv" style="margin-bottom:12px"><span>Units</span><span>${qty ? num(qty, 6) : '-'}</span><span>Practice cash</span><span>${usd(s.paper.cash)}</span></div>
       <button class=${`btn block big ${side === 'BUY' ? 'buy' : 'sell'}`} disabled=${!ok} onClick=${() => {
         if (type === 'MARKET') { paperFill(sym, side, qty, px); toast(`Practice ${side === 'BUY' ? 'buy' : 'sell'} filled`); }
         else { set((x) => ({ ...x, paper: { ...x.paper, orders: [...(x.paper.orders || []), { id: uid(), sym, side, qty, type, px: parseNum(lim), t: Date.now() }] } })); feedback('set'); toast('Practice order waiting for its price'); }
@@ -116,7 +116,7 @@ export function Guard() {
     <${Back} title="Risk guard" hint="A daily loss limit that locks new buys" onBack=${() => history.back()} />
     <div class=${`card ${gs.locked ? 'lockcard' : ''}`}>
       <div class="row between"><span class="label">Today</span><span class=${`tag ${gs.locked ? 'down' : g.on ? 'up' : 'watch'}`}>${gs.locked ? 'LOCKED until tomorrow' : g.on ? 'Watching' : 'Off'}</span></div>
-      <div class="big-num" style="margin-top:8px">${gs.loss == null ? '–' : `${gs.loss > 0 ? '−' : '+'}${num(Math.abs(gs.loss), 2)} ${cur}`}</div>
+      <div class="big-num" style="margin-top:8px">${gs.loss == null ? '-' : `${gs.loss > 0 ? '−' : '+'}${num(Math.abs(gs.loss), 2)} ${cur}`}</div>
       <div class="hint">${gs.loss == null ? (T212.connected ? 'Open Markets once today to start tracking the day' : 'Connect Trading 212 to track your real account') : 'Change of your Trading 212 account value since your first visit today'}</div>
       ${g.on && g.dailyLoss > 0 && gs.loss != null && html`<div class="bar hot" style="margin-top:10px"><i style=${{ width: Math.min(100, Math.max(0, (gs.loss / g.dailyLoss) * 100)) + '%' }}></i></div>`}
     </div>

@@ -13,7 +13,7 @@ import { feedback } from './fx.js';
 import { money, num } from './util.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctS = (x, d = 1) => (x == null ? '–' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
+const pctS = (x, d = 1) => (x == null ? '-' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
 
 export function AdvisorScreen() {
   const s = useStore();
@@ -50,10 +50,10 @@ export function AdvisorScreen() {
     <div class="card">${tr && tr.all[0].n ? html`
       <div class="hint" style="margin-bottom:8px">Every Buy or Sell call the advisor made on this phone, checked against what the price did next.</div>
       <div class="bt h"><span></span><span>5 days</span><span>20 days</span><span>60 days</span></div>
-      <div class="bt"><span>All calls right</span>${tr.all.map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '–'}</span>`)}</div>
-      <div class="bt"><span>Average result</span>${tr.all.map((o) => html`<span class=${o.avg > 0 ? 'up' : o.avg < 0 ? 'down' : ''}>${o.n ? pctS(o.avg) : '–'}</span>`)}</div>
+      <div class="bt"><span>All calls right</span>${tr.all.map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '-'}</span>`)}</div>
+      <div class="bt"><span>Average result</span>${tr.all.map((o) => html`<span class=${o.avg > 0 ? 'up' : o.avg < 0 ? 'down' : ''}>${o.n ? pctS(o.avg) : '-'}</span>`)}</div>
       <div class="bt"><span>Calls checked</span>${tr.all.map((o) => html`<span>${o.n}</span>`)}</div>
-      ${Object.entries(tr.sym).map(([sym, row]) => row[0].n ? html`<div class="bt"><span>${nameOf(sym)}</span>${row.map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '–'}</span>`)}</div>` : '')}
+      ${Object.entries(tr.sym).map(([sym, row]) => row[0].n ? html`<div class="bt"><span>${nameOf(sym)}</span>${row.map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '-'}</span>`)}</div>` : '')}
       <div class="note" style="margin-top:8px">${tr.total} calls logged, ${tr.pending} still waiting for 5 days to pass. Results are shown as they are, good or bad.</div>`
       : html`<div class="hint">${(s.calls || []).length} calls logged so far. Results appear once 5 trading days have passed after a Buy or Sell call.</div>`}</div>
     <div class="disclaim">${DISCLAIMER}</div>
@@ -108,7 +108,7 @@ export function SignalPanel({ sym, an, onAlert, onTrade, canTrade }) {
       ${plan.side !== 'long' && html`<div class="hint">If you hold it: consider taking some profit or tightening your stop. The buy-back zone is the nearest support.</div>`}`}
     ${bt && html`<details style="margin-top:12px"><summary class="hint" style="cursor:pointer">Backtest of the technical rules since ${new Date(bt.from * 1000).getFullYear()}</summary>
       <div class="bt h" style="margin-top:8px"><span></span><span>5 days</span><span>20 days</span><span>60 days</span></div>
-      ${[['Buy signals: rose', 'buy'], ['Sell signals: fell', 'sell'], ['Any day: rose', 'all']].map(([nm, k]) => html`<div class="bt"><span>${nm}</span>${bt[k].map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '–'}</span>`)}</div>
+      ${[['Buy signals: rose', 'buy'], ['Sell signals: fell', 'sell'], ['Any day: rose', 'all']].map(([nm, k]) => html`<div class="bt"><span>${nm}</span>${bt[k].map((o) => html`<span>${o.n ? Math.round(o.hit) + '%' : '-'}</span>`)}</div>
         <div class="bt" style="border-top:0;padding-top:0"><span class="hint">avg move (${bt[k][1].n} cases)</span>${bt[k].map((o) => html`<span class=${`hint ${o.avg > 0 ? 'up' : o.avg < 0 ? 'down' : ''}`}>${o.n ? pctS(o.avg) : ''}</span>`)}</div>`)}
       <div class="note" style="margin-top:6px">Compare the signal rows with "Any day": the edge is the difference. Macro, sentiment and positioning factors are not in this backtest (not enough free history).</div>
     </details>`}

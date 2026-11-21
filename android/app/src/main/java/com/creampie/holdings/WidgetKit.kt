@@ -133,7 +133,7 @@ object WidgetKit {
                     val x = arr.getJSONObject(i); val (last, pc) = quote(ctx, w, x.optString("sym"))
                     v.setViewVisibility(row, View.VISIBLE)
                     v.setTextViewText(rid("r", i, "n"), x.optString("name"))
-                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "–" else if (wide && last != null) "${price(last)}  ${pct(pc)}" else pct(pc))
+                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "-" else if (wide && last != null) "${price(last)}  ${pct(pc)}" else pct(pc))
                     v.setTextColor(rid("r", i, "v"), if ((pc ?: 0.0) >= 0) MINT else PINK)
                 }
                 if (arr.length() == 0) { v.setViewVisibility(R.id.row0, View.VISIBLE); v.setTextViewText(R.id.r0n, "Open the app to load your list"); v.setTextViewText(R.id.r0v, "") }
@@ -143,7 +143,7 @@ object WidgetKit {
                 val r = w?.optJSONObject("risk")
                 v.setTextViewText(R.id.label, "RISK")
                 val sc = r?.optInt("score", -1) ?: -1
-                v.setTextViewText(R.id.big, if (sc < 0) "–" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIXED")
+                v.setTextViewText(R.id.big, if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIXED")
                 v.setTextColor(R.id.big, if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD)
                 v.setTextViewText(R.id.sub, if (sc < 0) "open the app" else if (tiny) "$sc/100" else "${r?.optString("label")} · $sc/100"); v.setTextColor(R.id.sub, DIM)
                 if (!tiny && sc >= 0) { val (cw, ch) = chartPx(wDp - 26, 16); v.setImageViewBitmap(R.id.chart, meter(sc / 100.0, cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
@@ -155,7 +155,7 @@ object WidgetKit {
                 val arr = w?.optJSONArray("watch") ?: JSONArray(); for (i in 0 until arr.length()) if (arr.getJSONObject(i).optString("sym") == sym) name = arr.getJSONObject(i).optString("name")
                 val (last, pc) = quote(ctx, w, sym)
                 v.setTextViewText(R.id.label, (if (tiny) short(sym) else name).uppercase())
-                v.setTextViewText(R.id.big, if (pc == null) "–" else pct(pc)); v.setTextColor(R.id.big, if ((pc ?: 0.0) >= 0) MINT else PINK)
+                v.setTextViewText(R.id.big, if (pc == null) "-" else pct(pc)); v.setTextColor(R.id.big, if ((pc ?: 0.0) >= 0) MINT else PINK)
                 v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 16f else if (wDp < 150) 19f else 24f)
                 v.setTextViewText(R.id.sub, if (last == null) "" else price(last)); v.setTextColor(R.id.sub, DIM)
             }
@@ -236,7 +236,7 @@ object WidgetKit {
             c.drawArc(r, 135f, (270 * (score / 100)).toFloat().coerceAtLeast(2f), false, p)
         }
         val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = WHITE; textSize = size * 0.3f; textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
-        c.drawText(score?.let { Math.round(it).toString() } ?: "–", size / 2f, size / 2f + t.textSize * 0.35f, t)
+        c.drawText(score?.let { Math.round(it).toString() } ?: "-", size / 2f, size / 2f + t.textSize * 0.35f, t)
         return bm
     }
     fun meter(v: Double, w: Int, h: Int, d: Float): Bitmap {

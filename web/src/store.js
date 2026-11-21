@@ -181,7 +181,7 @@ export const accountById = (s, id) => s.accounts.find((a) => a.id === id);
 export const curOf = (s, id) => (id === CARD ? 'PLN' : (accountById(s, id) || {}).cur || 'PLN');
 export const catOf = (s, id) => s.cats.exp.find((c) => c.id === id) || s.cats.inc.find((c) => c.id === id) || { id, name: id || 'Other', icon: '•' };
 export const toPln = (s, amt, cur) => (cur === 'PLN' || !cur ? amt : amt * (s.rates[cur] || 0));
-export const placeName = (s, id) => (id === CARD ? s.card.name : (accountById(s, id) || { name: '—' }).name);
+export const placeName = (s, id) => (id === CARD ? s.card.name : (accountById(s, id) || { name: '-' }).name);
 
 // Txn types:
 //  exp  : spending, from account/card

@@ -244,7 +244,7 @@ export function PinSheet({ onClose }) {
   const [b, setB] = useState('');
   const ok = /^\d{4,6}$/.test(a) && a === b;
   return html`<${Sheet} title=${T.members} onClose=${onClose}>${(close) => html`
-    <div class="note" style="margin-bottom:12px">Choose a 4–6 digit PIN. You'll need it every time you open the app.${isNative() ? ' You can also use your fingerprint.' : ''} If you forget it, you'll have to reinstall and restore a backup.</div>
+    <div class="note" style="margin-bottom:12px">Choose a 4 to 6 digit PIN. You'll need it every time you open the app.${isNative() ? ' You can also use your fingerprint.' : ''} If you forget it, you'll have to reinstall and restore a backup.</div>
     <${Field} label="New PIN"><input class="input mono" type="password" inputmode="numeric" maxlength="6" value=${a} onInput=${(e) => setA(e.target.value.replace(/\D/g, ''))} /><//>
     <${Field} label="Again"><input class="input mono" type="password" inputmode="numeric" maxlength="6" value=${b} onInput=${(e) => setB(e.target.value.replace(/\D/g, ''))} /><//>
     <div class="btns">

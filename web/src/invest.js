@@ -18,7 +18,7 @@ import { feedback } from './fx.js';
 import { STYLES } from './advisor.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctS = (x, d = 1) => (x == null || !Number.isFinite(x) ? '–' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
+const pctS = (x, d = 1) => (x == null || !Number.isFinite(x) ? '-' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
 const HOLO_PAL = ['#00D2FF', '#FFE36E', '#7A5CFF', '#FF3CC8', '#3CFFB4', '#9DF6FF', '#FF8F5C', '#A794FF'];
 
 // asset class of a holding
@@ -89,7 +89,7 @@ export function PortfolioHub() {
       <div class="hint">${hv.cost ? html`Cost <${Money} v=${hv.cost} d=${0} /> · <span class=${hv.v >= hv.cost ? 'up' : 'down'}>${pctS(((hv.v - hv.cost) / hv.cost) * 100)}</span>` : 'Add holdings by hand or import a CSV export'}${hv.missing ? ` · ${hv.missing} without a price` : ''}</div></div>
     ${brokers.map((b) => html`<div class="sect"><span class="h-title">${b}</span></div><div class="card" style="padding:4px 14px">${hs.filter((h) => (h.broker || 'Other') === b).map((h) => { const q = a.q[h.sym]; const px = q ? q.last : h.lastPx; const val = px != null ? h.qty * px : null; const pl = px != null && h.cost ? ((px - h.cost) / h.cost) * 100 : null;
       return html`<button class="item" onClick=${() => setSheet({ edit: h })}><span class="em sym">${(nameOf(h.sym) || h.sym).slice(0, 4).toUpperCase()}</span><div class="grow"><div class="t1">${h.name || nameOf(h.sym)}</div><div class="t2">${num(h.qty, h.qty < 10 ? 4 : 2)} × ${px != null ? fmtPrice(px, h.sym) : 'no price'}${q && q.pct != null ? ` · today ${pctS(q.pct)}` : ''}</div></div>
-        <div style="text-align:right"><div class="amt">${val != null ? html`<${Money} v=${toPln(s, val, h.cur || 'USD')} d=${0} />` : '–'}</div>${pl != null && html`<span class=${`chg ${pl >= 0 ? 'up' : 'down'}`}>${pctS(pl)}</span>`}</div></button>`; })}</div>`)}
+        <div style="text-align:right"><div class="amt">${val != null ? html`<${Money} v=${toPln(s, val, h.cur || 'USD')} d=${0} />` : '-'}</div>${pl != null && html`<span class=${`chg ${pl >= 0 ? 'up' : 'down'}`}>${pctS(pl)}</span>`}</div></button>`; })}</div>`)}
     <div class="btns" style="margin-top:6px"><button class="btn holo" onClick=${() => setSheet({ add: true })}><${Icon} n="plus" size=${17} /> Add holding</button><button class="btn" onClick=${() => setSheet({ csv: true })}><${Icon} n="upload" size=${17} /> Import CSV</button></div>
     <div class="note" style="margin:12px 4px">Robinhood and XTB have no API we can use, so their holdings are entered by hand or imported from their CSV export. Prices update live.</div>
     ${sheet && (sheet.add || sheet.edit) && html`<${HoldingSheet} h=${sheet.edit} onClose=${() => setSheet(null)} />`}
@@ -339,7 +339,7 @@ export function Journal() {
   const wins = closed.filter((j) => parseNum(j.result) > 0).length;
   return html`<div class="screen stagger">
     <${Back} title="Trade journal" hint="Why you bought or sold, and what happened" onBack=${() => history.back()} right=${html`<button class="iconbtn" onClick=${() => setEdit({})} aria-label="Add"><${Icon} n="plus" size=${18} /></button>`} />
-    <div class="stat3"><div><div class="l">Entries</div><div class="v">${js.length}</div></div><div><div class="l">Closed</div><div class="v">${closed.length}</div></div><div><div class="l">Win rate</div><div class="v">${closed.length ? Math.round((wins / closed.length) * 100) + '%' : '–'}</div></div></div>
+    <div class="stat3"><div><div class="l">Entries</div><div class="v">${js.length}</div></div><div><div class="l">Closed</div><div class="v">${closed.length}</div></div><div><div class="l">Win rate</div><div class="v">${closed.length ? Math.round((wins / closed.length) * 100) + '%' : '-'}</div></div></div>
     <div class="card" style="padding:4px 14px;margin-top:12px">${js.length ? js.map((j) => html`<button class="item" onClick=${() => setEdit(j)}><span class=${`em ${j.side === 'SELL' ? 'down' : ''}`} style="font-size:10px;font-family:var(--mono)">${j.side}</span><div class="grow"><div class="t1">${nameOf(j.sym) || j.sym}${j.paper ? ' · practice' : ''}</div><div class="t2">${j.date} · ${num(j.qty || 0, 4)} @ ${j.px != null ? fmtPrice(j.px, j.sym) : '?'}${j.why ? ' · ' + j.why : ''}</div></div>${j.result !== undefined && j.result !== '' && html`<span class=${`chg ${parseNum(j.result) >= 0 ? 'up' : 'down'}`}>${j.result}%</span>`}</button>`) : html`<div class="empty">No entries yet. Practice and Trading 212 trades are added here automatically.</div>`}</div>
     ${edit && html`<${JournalSheet} j=${edit} onClose=${() => setEdit(null)} />`}
   </div>`;

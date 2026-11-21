@@ -13,7 +13,7 @@ import { feedback } from './fx.js';
 import { parseNum } from './util.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '–' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
+const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '-' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
 
 export const UNIVERSE = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'BRK.B', 'AVGO', 'LLY', 'JPM', 'V', 'MA', 'UNH', 'XOM', 'JNJ', 'WMT', 'PG', 'HD', 'COST', 'ORCL', 'NFLX', 'CVX', 'MRK', 'ABBV', 'KO', 'PEP', 'BAC', 'AMD', 'ADBE', 'CRM', 'TMO', 'MCD', 'CSCO', 'ACN', 'ABT', 'LIN', 'WFC', 'DIS', 'INTC', 'QCOM', 'TXN', 'IBM', 'GE', 'CAT', 'AMGN', 'PM', 'INTU', 'NOW', 'GS', 'MS', 'ISRG', 'UBER', 'BKNG', 'SPGI', 'BLK', 'HON', 'PFE', 'NKE', 'T', 'VZ', 'SBUX', 'PYPL', 'SHOP', 'PLTR', 'COIN', 'MSTR', 'ARM', 'ASML', 'TSM', 'BABA', 'SAP', 'NVO', 'SONY', 'TM',
   'SPY', 'QQQ', 'VOO', 'VTI', 'IWM', 'DIA', 'GLD', 'SLV', 'TLT', 'VNQ', 'XLE', 'XLK', 'SMH', 'ARKK', 'VUAA-GB', 'CSPX-GB', 'VUSA-GB', 'EQQQ-GB', 'IWDA-GB'];
@@ -39,7 +39,7 @@ export function Screener() {
       <table class="table"><thead><tr><th>Name</th><th>Price</th><th>Today</th><th>${p === 'cheap' ? 'P/E' : p === 'div' ? 'Yield' : '52w'}</th></tr></thead>
       <tbody>${list.slice(0, 60).map((x) => html`<tr onClick=${() => go('asset/' + encodeURIComponent(x.sym))} style="cursor:pointer"><td><div style="font-weight:500">${x.sym.replace(/-GB$/, '')}</div><div class="hint" style="max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.q.name || ''}</div></td>
         <td>${fmtPrice(x.q.last, x.sym)}</td><td class=${x.q.pct >= 0 ? 'up' : 'down'}>${pctS(x.q.pct)}</td>
-        <td>${p === 'cheap' ? (x.q.pe ? x.q.pe.toFixed(1) : '–') : p === 'div' ? x.dy.toFixed(2) + '%' : x.pos != null ? html`<div class="bar" style="width:52px;display:inline-block"><i style=${{ width: x.pos * 100 + '%' }}></i></div>` : '–'}</td></tr>`)}</tbody></table>
+        <td>${p === 'cheap' ? (x.q.pe ? x.q.pe.toFixed(1) : '-') : p === 'div' ? x.dy.toFixed(2) + '%' : x.pos != null ? html`<div class="bar" style="width:52px;display:inline-block"><i style=${{ width: x.pos * 100 + '%' }}></i></div>` : '-'}</td></tr>`)}</tbody></table>
       ${!list.length && html`<div class="hint" style="padding:14px 0">${rows.length ? 'Nothing matches right now.' : 'Loading live quotes…'}</div>`}
     </div>
     <div class="note" style="margin:10px 4px">Tap any row for its chart and full advisor score. Prices from CNBC.</div>
@@ -64,7 +64,7 @@ export function Earnings() {
     ${m === undefined ? html`<div class="card"><div class="hint">Loading…</div></div>` : !m ? html`<div class="callout">Earnings data is not published yet. It is refreshed by the online job every 6 hours.</div>` : html`
       ${Object.entries(days).map(([d, rs]) => html`<div class="cal-day">${new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })}</div>
         <div class="card" style="padding:4px 14px">${rs.sort((a, b) => b.cap - a.cap).map((r) => html`<button class="item" onClick=${() => go('asset/' + encodeURIComponent(r.sym))}><span class="em sym">${r.sym.slice(0, 4)}</span><div class="grow"><div class="t1">${r.name}${mine.has(r.sym) ? html` <span class="tag info">yours</span>` : ''}</div><div class="t2">${capTxt(r.cap)} · ${r.time || 'time not set'}</div></div>
-          <div style="text-align:right"><div class="mono" style="font-size:12px">EPS est ${r.eps || '–'}</div><div class="hint mono" style="font-size:11px">last year ${r.lastEps || '–'}</div></div></button>`)}</div>`)}
+          <div style="text-align:right"><div class="mono" style="font-size:12px">EPS est ${r.eps || '-'}</div><div class="hint mono" style="font-size:11px">last year ${r.lastEps || '-'}</div></div></button>`)}</div>`)}
       ${!rows.length && html`<div class="card"><div class="hint">${only ? 'None of your assets report in the next two weeks.' : 'No big US earnings found.'}</div></div>`}
       <div class="note" style="margin:10px 4px">From the Nasdaq earnings calendar, updated ${new Date(m.at).toLocaleString()}. Stocks often move 5 to 10% on results day.</div>`}
   </div>`;
@@ -135,7 +135,7 @@ export function Backtest() {
         <tr><td>Per year</td><td>${pctS(res.s.cagr, 1)}</td><td>${pctS(res.b.cagr, 1)}</td></tr>
         <tr><td>Worst fall</td><td class="down">${pctS(res.s.dd, 0)}</td><td class="down">${pctS(res.b.dd, 0)}</td></tr>
         <tr><td>Trades</td><td>${res.trades.length}</td><td>1</td></tr>
-        <tr><td>Winning trades</td><td>${res.win != null ? Math.round(res.win) + '%' : '–'}</td><td></td></tr>
+        <tr><td>Winning trades</td><td>${res.win != null ? Math.round(res.win) + '%' : '-'}</td><td></td></tr>
         <tr><td>Time invested</td><td>${Math.round(res.inMkt)}%</td><td>100%</td></tr></tbody></table>
         <div class="note" style="margin-top:8px">${res.s.yrs.toFixed(1)} years of real daily closes, no fees, taxes or slippage. Past results do not promise future ones; a rule that worked before can stop working.</div></div>`}
   </div>`;

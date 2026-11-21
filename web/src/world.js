@@ -15,7 +15,7 @@ import { eventPlaybook } from './signals.js';
 import { feedback } from './fx.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '–' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
+const pctS = (x, d = 2) => (x == null || !Number.isFinite(x) ? '-' : `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(d)}%`);
 const heatBg = (p) => { if (p == null) return 'rgba(255,255,255,.04)'; const k = Math.min(1, Math.abs(p) / 2.5); return p >= 0 ? `rgba(60,255,180,${0.06 + k * 0.32})` : `rgba(255,92,138,${0.06 + k * 0.34})`; };
 export const SECTORS = [['XLK', 'Technology'], ['XLF', 'Financials'], ['XLV', 'Health care'], ['XLY', 'Consumer'], ['XLP', 'Staples'], ['XLE', 'Energy'], ['XLI', 'Industrials'], ['XLB', 'Materials'], ['XLU', 'Utilities'], ['XLRE', 'Real estate'], ['XLC', 'Communication'], ['SMH', 'Chips']];
 const FX = ['PLN=', 'EURPLN=', 'GBPPLN=', 'AED=', 'INR=', 'EUR='];
@@ -77,19 +77,19 @@ function Now({ q }) {
       <div class="note">Regular hours, holidays not included. Crypto trades 24/7. Gold and forex trade nearly 24h on weekdays.</div></div>
 
     <div class="sect"><span class="h-title">World indices</span></div>
-    <div class="heat">${WORLD_IDX.map(([sym, nm, c]) => { const x = q[sym]; return html`<button style=${{ background: heatBg(x && x.pct) }} onClick=${() => go('asset/' + encodeURIComponent(sym))}><div class="hn">${nm}</div><div class="hv">${x && x.pct != null ? pctS(x.pct) : '–'}</div><div class="hint" style="font-size:10px">${c}</div></button>`; })}</div>
+    <div class="heat">${WORLD_IDX.map(([sym, nm, c]) => { const x = q[sym]; return html`<button style=${{ background: heatBg(x && x.pct) }} onClick=${() => go('asset/' + encodeURIComponent(sym))}><div class="hn">${nm}</div><div class="hv">${x && x.pct != null ? pctS(x.pct) : '-'}</div><div class="hint" style="font-size:10px">${c}</div></button>`; })}</div>
 
     <div class="sect"><span class="h-title">US sectors today</span></div>
-    <div class="heat">${SECTORS.map(([sym, nm]) => { const x = q[sym]; return html`<button style=${{ background: heatBg(x && x.pct) }} onClick=${() => go('asset/' + sym)}><div class="hn">${nm}</div><div class="hv">${x && x.pct != null ? pctS(x.pct) : '–'}</div></button>`; })}</div>
+    <div class="heat">${SECTORS.map(([sym, nm]) => { const x = q[sym]; return html`<button style=${{ background: heatBg(x && x.pct) }} onClick=${() => go('asset/' + sym)}><div class="hn">${nm}</div><div class="hv">${x && x.pct != null ? pctS(x.pct) : '-'}</div></button>`; })}</div>
 
     <div class="sect"><span class="h-title">Currency board</span><span class="hint mono">zł per unit</span></div>
     <div class="card" style="padding:4px 14px">${fx.map(([c, v, p, sym]) => html`<button class="item" onClick=${() => sym && go('asset/' + encodeURIComponent(sym))}>
       <span class="em sym">${c.slice(0, 3)}</span><div class="grow"><div class="t1">${c}/PLN</div><div class="t2">${sym ? 'live' : 'cross rate from live USD prices'}${s.rates[c.slice(0, 3)] ? ` · NBP ${s.rates[c.slice(0, 3)].toFixed(4)}` : ''}</div></div>
-      <div style="text-align:right"><div class="mono">${v != null ? v.toFixed(4) : '–'}</div><span class=${`chg ${p >= 0 ? 'up' : 'down'}`}>${pctS(p)}</span></div></button>`)}</div>
+      <div style="text-align:right"><div class="mono">${v != null ? v.toFixed(4) : '-'}</div><span class=${`chg ${p >= 0 ? 'up' : 'down'}`}>${pctS(p)}</span></div></button>`)}</div>
 
     <div class="sect"><span class="h-title">Commodities, crypto, rates</span></div>
     <div class="heat">${MACRO.map((sym) => { const x = q[sym]; const nm = { '@GC.1': 'Gold', '@SI.1': 'Silver', '@CL.1': 'Oil (WTI)', 'BTC-USD': 'Bitcoin', '.DXY': 'Dollar index', US10Y: 'US 10-year', US2Y: 'US 2-year', '.VIX': 'VIX fear' }[sym];
-      return html`<button style=${{ background: heatBg(x && (sym.startsWith('US') ? null : x.pct)) }} onClick=${() => go('asset/' + encodeURIComponent(sym))}><div class="hn">${nm}</div><div class="hv">${x ? (sym.startsWith('US') ? x.last.toFixed(3) + '%' : fmtPrice(x.last, sym, x.last > 1000 ? 0 : 2)) : '–'}</div><div class=${`hint ${x && x.pct >= 0 ? 'up' : 'down'}`} style="font-size:10.5px">${x ? (sym.startsWith('US') && x.chg != null ? `${x.chg >= 0 ? '+' : ''}${(x.chg * 100).toFixed(1)} bp` : pctS(x.pct)) : ''}</div></button>`; })}</div>
+      return html`<button style=${{ background: heatBg(x && (sym.startsWith('US') ? null : x.pct)) }} onClick=${() => go('asset/' + encodeURIComponent(sym))}><div class="hn">${nm}</div><div class="hv">${x ? (sym.startsWith('US') ? x.last.toFixed(3) + '%' : fmtPrice(x.last, sym, x.last > 1000 ? 0 : 2)) : '-'}</div><div class=${`hint ${x && x.pct >= 0 ? 'up' : 'down'}`} style="font-size:10.5px">${x ? (sym.startsWith('US') && x.chg != null ? `${x.chg >= 0 ? '+' : ''}${(x.chg * 100).toFixed(1)} bp` : pctS(x.pct)) : ''}</div></button>`; })}</div>
   `;
 }
 
@@ -136,7 +136,7 @@ function Calendar() {
   return html`<div class="card">${!cal.length ? html`<div class="hint">No calendar loaded (it refreshes from the online job every few hours).</div>` : Object.entries(days).map(([d, es]) => html`
     <div class="cal-day">${new Date(d).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })}</div>
     ${es.map((e) => html`<details class=${`cal ${Date.parse(e.date) < Date.now() ? 'past' : ''}`}><summary class="row" style="gap:10px"><span class="mono hint" style="width:44px">${new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span class=${`imp ${String(e.impact).toLowerCase()}`}></span><span class="grow" style="font-size:13.5px">${e.title}</span><span class="pill">${e.country}</span></summary>
-      <div class="cal-more"><div class="kv" style="font-size:12.5px;margin-bottom:6px"><span>Expected</span><span>${e.forecast || '–'}</span><span>Previous</span><span>${e.previous || '–'}</span><span>Actual</span><span>${e.actual || 'not in the free feed'}</span></div>${eventPlaybook(e.title)}</div></details>`)}`)}
+      <div class="cal-more"><div class="kv" style="font-size:12.5px;margin-bottom:6px"><span>Expected</span><span>${e.forecast || '-'}</span><span>Previous</span><span>${e.previous || '-'}</span><span>Actual</span><span>${e.actual || 'not in the free feed'}</span></div>${eventPlaybook(e.title)}</div></details>`)}`)}
     <div class="note" style="margin-top:10px">This week's important US, euro area and China releases. Times in your time zone.</div></div>`;
 }
 
@@ -161,10 +161,10 @@ function Banks() {
   const nbp = d && d.macro && d.macro.nbp;
   const row = (nm, sub, rate, extra) => html`<div class="card"><div class="row between"><div><div style="font-weight:600">${nm}</div><div class="hint">${sub}</div></div><div class="big-num mono" style="font-size:22px">${rate}</div></div>${extra && html`<div class="hint" style="margin-top:8px;line-height:1.5">${extra}</div>`}</div>`;
   return html`
-    ${row('Federal Reserve (US)', fed ? `Target range, since ${fed.moves.length ? fed.moves.at(-1).date : fed.date}` : 'New York Fed', fed ? `${fed.lo.toFixed(2)}–${fed.hi.toFixed(2)}%`.replace('–', ' to ') : '–',
+    ${row('Federal Reserve (US)', fed ? `Target range, since ${fed.moves.length ? fed.moves.at(-1).date : fed.date}` : 'New York Fed', fed ? `${fed.lo.toFixed(2)} to ${fed.hi.toFixed(2)}%`.replace('-', ' to ') : '-',
       fed && y2 ? `The 2-year yield (${y2.last.toFixed(2)}%) is ${y2.last < (fed.lo + fed.hi) / 2 - 0.2 ? 'below the Fed rate: markets expect cuts' : y2.last > (fed.lo + fed.hi) / 2 + 0.2 ? 'above the Fed rate: markets expect hikes' : 'close to the Fed rate: markets expect a hold'}.${fed.moves.length ? ` Last move: ${fed.moves.at(-1).to[1] > fed.moves.at(-1).from[1] ? 'hike' : 'cut'} on ${fed.moves.at(-1).date}.` : ''}` : null)}
     ${row('European Central Bank', d && d.ecb ? `Deposit rate, since ${d.ecb.date}` : 'ECB data portal', d && d.ecb ? d.ecb.rate.toFixed(2) + '%' : d ? 'unavailable' : '…', 'Sets rates for the euro. Moves EUR/PLN and European stocks.')}
-    ${row('Narodowy Bank Polski', nbp ? `Reference rate, since ${nbp.since}` : 'NBP', nbp ? nbp.ref.toFixed(2) + '%' : 'unavailable', nbp ? `Lombard ${nbp.lombard != null ? nbp.lombard.toFixed(2) + '%' : '–'}, deposit ${nbp.deposit != null ? nbp.deposit.toFixed(2) + '%' : '–'}. Affects your złoty savings and loans.` : 'Loaded by the online job; not published yet.')}
+    ${row('Narodowy Bank Polski', nbp ? `Reference rate, since ${nbp.since}` : 'NBP', nbp ? nbp.ref.toFixed(2) + '%' : 'unavailable', nbp ? `Lombard ${nbp.lombard != null ? nbp.lombard.toFixed(2) + '%' : '-'}, deposit ${nbp.deposit != null ? nbp.deposit.toFixed(2) + '%' : '-'}. Affects your złoty savings and loans.` : 'Loaded by the online job; not published yet.')}
     ${row('Central Bank of the UAE', 'Base rate', 'follows the Fed', 'The dirham is pegged to the US dollar, so the UAE base rate moves together with the Fed. There is no free live feed for the exact number.')}
   `;
 }

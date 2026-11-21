@@ -19,8 +19,8 @@ import { guardState, coolingNeeded, coolingLeft, startCooling, coolingDone, clea
 import { addJournal } from './invest.js';
 
 const go = (r) => { location.hash = '#/' + r; };
-const pctTxt = (v, d = 2) => (v == null || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}%`);
-const money = (v, cur = 'PLN', d = 2) => (v == null || !Number.isFinite(v) ? '—' : `${v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d })} ${cur === 'PLN' ? 'zł' : cur}`);
+const pctTxt = (v, d = 2) => (v == null || !Number.isFinite(v) ? '-' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}%`);
+const money = (v, cur = 'PLN', d = 2) => (v == null || !Number.isFinite(v) ? '-' : `${v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d })} ${cur === 'PLN' ? 'zł' : cur}`);
 const statusTxt = (q) => !q ? '' : q.h24 ? '24h market' : q.status === 'REG_MKT' ? 'Market open' : q.status === 'PRE_MKT' ? 'Pre-market' : q.status === 'POST_MKT' ? 'After hours' : q.status ? 'Market closed' : '';
 
 // ---------- small hook: Trading 212 portfolio (positions + summary), refreshed while visible ----------
@@ -89,7 +89,7 @@ export function Markets() {
       ${list.length ? list.map((w, i) => html`<${WatchRow} w=${w} q=${a.q[w.sym]} edit=${edit} first=${i === 0} last=${i === list.length - 1} />`) : html`<div class="empty">Your watchlist is empty.</div>`}
     </div>
     <button class="btn block" onClick=${() => setSheet('search')}><${Icon} n="plus" size=${18} /> Add stock or crypto</button>
-    <div class="note" style="margin:12px 4px">Stocks: live during US market hours (15:30–22:00 Polish time), plus pre-market and after-hours. Crypto trades 24/7 (Coinbase prices in USD). Charts and signals are a guide, not advice.</div>
+    <div class="note" style="margin:12px 4px">Stocks: live during US market hours (15:30 to 22:00 Polish time), plus pre-market and after-hours. Crypto trades 24/7 (Coinbase prices in USD). Charts and signals are a guide, not advice.</div>
     ${sheet === 'search' && html`<${SearchSheet} onClose=${() => setSheet(null)} />`}
   </div>`;
 }
@@ -170,7 +170,7 @@ export function Asset({ sym }) {
 
     <${ChartCard} sym=${sym} livePrice=${q && q.last} alerts=${als} onAlertMove=${(id, field, price) => { updateAlert(id, { [field]: price, firedAt: null }); toast('Alert moved to ' + fmtPrice(price, sym), 'bell'); }} />
     ${isCrypto(sym) && html`<div class="card"><div class="row between" style="margin-bottom:8px"><span class="label">Market depth</span><span class="hint">±2% of price</span></div><${Depth} sym=${sym} /></div>
-      <div class="stat3" style="margin-bottom:12px"><div><div class="l">24h high</div><div class="v">${q ? fmtPrice(q.hi, sym) : '–'}</div></div><div><div class="l">24h low</div><div class="v">${q ? fmtPrice(q.lo, sym) : '–'}</div></div><div><div class="l">Fear / Greed</div><div class=${`v ${fg ? (fg.v >= 55 ? 'gold' : fg.v <= 45 ? 'down' : '') : ''}`}>${fg ? `${fg.v} ${fg.label.split(' ').pop()}` : '–'}</div></div></div>`}
+      <div class="stat3" style="margin-bottom:12px"><div><div class="l">24h high</div><div class="v">${q ? fmtPrice(q.hi, sym) : '-'}</div></div><div><div class="l">24h low</div><div class="v">${q ? fmtPrice(q.lo, sym) : '-'}</div></div><div><div class="l">Fear / Greed</div><div class=${`v ${fg ? (fg.v >= 55 ? 'gold' : fg.v <= 45 ? 'down' : '') : ''}`}>${fg ? `${fg.v} ${fg.label.split(' ').pop()}` : '-'}</div></div></div>`}
 
     <${SignalPanel} sym=${sym} an=${an} canTrade=${!!inst} onTrade=${(side) => setSheet({ trade: side })} onAlert=${() => setSheet('alert')} />
 
@@ -298,9 +298,9 @@ function TradeSheet({ sym, side: side0, inst, q, pos, onClose, an }) {
       ${type !== 'MARKET' && html`<${Field} label="Valid"><${Seg} options=${[['DAY', 'Today only'], ['GOOD_TILL_CANCEL', 'Until cancelled']]} value=${validity} onChange=${setValidity} /><//>`}
       ${type === 'MARKET' && inst.extendedHours && html`<${SettingRow} title="Allow pre-market / after hours" hint="Otherwise it waits for the regular session"><${Switch} on=${ext} onChange=${setExt} /><//>`}
       <div class="card" style="padding:12px"><div class="kv">
-        <span>Price now${q && q.ext && q.status !== 'REG_MKT' ? (q.ext.type === 'PRE_MKT' ? ' (pre-market)' : ' (after hours)') : ''}</span><span>${q ? fmtPrice(nowPx, sym) : '—'}</span>
-        <span>Shares</span><span>${Number.isFinite(qty) ? num(qty, 4) : '—'}</span>
-        <span>Estimated ${side === 'BUY' ? 'cost' : 'you get'}</span><span>${estCost != null ? '≈ ' + money(estCost, acct) : '—'}</span>
+        <span>Price now${q && q.ext && q.status !== 'REG_MKT' ? (q.ext.type === 'PRE_MKT' ? ' (pre-market)' : ' (after hours)') : ''}</span><span>${q ? fmtPrice(nowPx, sym) : '-'}</span>
+        <span>Shares</span><span>${Number.isFinite(qty) ? num(qty, 4) : '-'}</span>
+        <span>Estimated ${side === 'BUY' ? 'cost' : 'you get'}</span><span>${estCost != null ? '≈ ' + money(estCost, acct) : '-'}</span>
         ${cash != null && html`<span>Cash to trade</span><span>${money(cash, acct)}</span>`}
       </div>${instCur !== acct && html`<div class="hint" style="margin-top:6px">Trading 212 converts ${acct} → ${instCur} and charges a small FX fee (about 0.15%).</div>`}</div>
       ${problems.length > 0 && (val || gs.locked) && html`<div class=${gs.locked && side === 'BUY' ? 'callout bad' : 'note warn'} style="margin-bottom:8px">${problems[0]}</div>`}

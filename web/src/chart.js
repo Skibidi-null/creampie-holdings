@@ -407,7 +407,7 @@ export function SeriesChart({ data, height = 220, fmt = (v) => v.toFixed(2), col
     s.ch.timeScale().fitContent();
   }, [ready, data, extra.length]);
   return html`<div class="lwc" style=${{ height: height + 'px' }}><div ref=${box} style="position:absolute;top:0;right:0;bottom:0;left:0"></div>
-    <div class="legend2">${tip ? html`<span><b>${fmt(tip.v)}</b> · ${new Date(tip.t * 1000).toLocaleDateString()}</span>` : ''}${extra.map((e) => html`<span style=${{ color: e.color }}>— ${e.name}</span>`)}</div>
+    <div class="legend2">${tip ? html`<span><b>${fmt(tip.v)}</b> · ${new Date(tip.t * 1000).toLocaleDateString()}</span>` : ''}${extra.map((e) => html`<span style=${{ color: e.color }}>- ${e.name}</span>`)}</div>
     <div class="hintline">pinch · drag · double-tap to reset</div>
     ${!ready && html`<div class="loading"><div class="shimmer"></div></div>`}</div>`;
 }
