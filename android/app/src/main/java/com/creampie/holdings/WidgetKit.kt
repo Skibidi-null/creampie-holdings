@@ -76,6 +76,7 @@ object WidgetKit {
         val wDp = max(opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 110), 40)
         val hDp = max(opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)), 40)
         val tiny = wDp < 100 || hDp < 70
+        val short = hDp < 90
         val tall = hDp >= 150
         val wide = wDp >= 220
         val dens = ctx.resources.displayMetrics.density
@@ -88,6 +89,11 @@ object WidgetKit {
         v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 17f else if (wide && tall) 34f else 24f)
         val chartPx = { ww: Int, hh: Int -> Pair(min((ww * dens).toInt(), 900), min((hh * dens).toInt(), 400)) }
         var route = "home"
+        // compact spacing for one-row and 1x1 widgets
+        val padH = ((if (wDp < 90) 9 else 13) * dens).toInt(); val padV = ((if (short) 7 else 13) * dens).toInt()
+        v.setViewPadding(R.id.pad, padH, padV, padH, padV)
+        v.setTextViewTextSize(R.id.label, TypedValue.COMPLEX_UNIT_SP, if (short) 8.5f else 9.5f)
+        v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, if (short) 9.5f else 11f)
         when (kind) {
             "nw" -> {
                 route = "networth"
@@ -150,14 +156,14 @@ object WidgetKit {
                 val (last, pc) = quote(ctx, w, sym)
                 v.setTextViewText(R.id.label, (if (tiny) short(sym) else name).uppercase())
                 v.setTextViewText(R.id.big, if (pc == null) "–" else pct(pc)); v.setTextColor(R.id.big, if ((pc ?: 0.0) >= 0) MINT else PINK)
-                v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 16f else 24f)
+                v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 16f else if (wDp < 150) 19f else 24f)
                 v.setTextViewText(R.id.sub, if (last == null) "" else price(last)); v.setTextColor(R.id.sub, DIM)
             }
             "markets" -> {
                 route = "world/now"
                 v.setTextViewText(R.id.label, "MARKETS NOW"); v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
-                val list = Sessions.status()
-                val n = if (tiny) 2 else min(list.size, max(2, (hDp - 36) / 20).coerceAtMost(6))
+                val list = Sessions.status(wDp < 170)
+                val n = if (hDp < 70) 1 else if (tiny) 2 else min(list.size, max(2, (hDp - 36) / 20).coerceAtMost(6))
                 for (i in 0 until 6) {
                     val row = rid("row", i); if (i >= n) { v.setViewVisibility(row, View.GONE); continue }
                     val (nm, open, txt) = list[i]; v.setViewVisibility(row, View.VISIBLE)
@@ -190,6 +196,8 @@ object WidgetKit {
                 v.setTextViewText(R.id.sub, if (n != null) String.format(Locale.US, "%.1f%% away", n.optDouble("dist")) else "Tap to add one"); v.setTextColor(R.id.sub, GOLD)
             }
         }
+        if (short) v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (wDp < 90) 13f else 15f)
+        if (hDp < 62 && kind != "ticker") v.setViewVisibility(R.id.sub, View.GONE) else v.setViewVisibility(R.id.sub, View.VISIBLE)
         if (tall && kind != "watch" && kind != "markets") { v.setViewVisibility(R.id.foot, View.VISIBLE); v.setTextViewText(R.id.foot, "Creampie Holdings") }
         v.setOnClickPendingIntent(R.id.root, open(ctx, route, 9100 + id))
         mgr.updateAppWidget(id, v)
@@ -250,17 +258,17 @@ object WidgetKit {
 
 /** Regular trading hours of the main exchanges (holidays not modelled). */
 object Sessions {
-    private data class Ex(val name: String, val tz: String, val open: Int, val close: Int)
-    private val EX = listOf(Ex("New York", "America/New_York", 570, 960), Ex("London", "Europe/London", 480, 990), Ex("Frankfurt", "Europe/Berlin", 540, 1050),
-        Ex("Warsaw", "Europe/Warsaw", 540, 1020), Ex("Tokyo", "Asia/Tokyo", 540, 930), Ex("Hong Kong", "Asia/Hong_Kong", 570, 960))
-    fun status(): List<Triple<String, Boolean, String>> = EX.map { e ->
+    private data class Ex(val name: String, val short: String, val tz: String, val open: Int, val close: Int)
+    private val EX = listOf(Ex("New York", "NY", "America/New_York", 570, 960), Ex("London", "LDN", "Europe/London", 480, 990), Ex("Frankfurt", "FRA", "Europe/Berlin", 540, 1050),
+        Ex("Warsaw", "WAW", "Europe/Warsaw", 540, 1020), Ex("Tokyo", "TKY", "Asia/Tokyo", 540, 930), Ex("Hong Kong", "HK", "Asia/Hong_Kong", 570, 960))
+    fun status(short: Boolean = false): List<Triple<String, Boolean, String>> = EX.map { e0 -> val e = if (short) e0.copy(name = e0.short) else e0
         val t = ZonedDateTime.now(ZoneId.of(e.tz)); val m = t.hour * 60 + t.minute
         val weekday = t.dayOfWeek != DayOfWeek.SATURDAY && t.dayOfWeek != DayOfWeek.SUNDAY
-        if (weekday && m in e.open until e.close) Triple(e.name, true, "open · ${fmt(e.close - m)}")
+        if (weekday && m in e.open until e.close) Triple(e.name, true, if (short) "open" else "open · ${fmt(e.close - m)}")
         else {
             var add = 0; var d = t.dayOfWeek; var mm = m
             for (i in 0..7) { val wd = d != DayOfWeek.SATURDAY && d != DayOfWeek.SUNDAY; if (wd && mm < e.open) { add += e.open - mm; break }; add += 1440 - mm; mm = 0; d = d.plus(1) }
-            Triple(e.name, false, "opens ${fmt(add)}")
+            Triple(e.name, false, if (short) fmt(add) else "opens ${fmt(add)}")
         }
     }
     private fun fmt(m: Int) = if (m < 60) "${m}m" else if (m < 1440) "${m / 60}h ${m % 60}m" else "${m / 1440}d ${m % 1440 / 60}h"
