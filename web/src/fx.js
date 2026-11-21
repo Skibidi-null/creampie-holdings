@@ -74,6 +74,13 @@ function step() {
   tilt.subs.forEach((f) => f(tilt));
   if (Math.abs(tx - tilt.x) > 0.002 || Math.abs(ty - tilt.y) > 0.002) raf = requestAnimationFrame(step);
 }
+// background parallax follows the same smoothed tilt; calm mode on reduced motion or low battery
+tilt.subs.add((t) => { const r = document.documentElement.style; r.setProperty('--px', t.x.toFixed(3)); r.setProperty('--py', t.y.toFixed(3)); });
+function calm(on) { document.documentElement.classList.toggle('calm', !!on); }
+calm(reduced());
+try { navigator.getBattery && navigator.getBattery().then((b) => { const f = () => calm(reduced() || (!b.charging && b.level <= 0.2)); f(); b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); }); } catch {}
+document.addEventListener('visibilitychange', () => { document.documentElement.classList.toggle('calm', document.hidden || reduced()); });
+
 export function startTilt() {
   if (reduced() || !('DeviceOrientationEvent' in window)) return false;
   const D = window.DeviceOrientationEvent;

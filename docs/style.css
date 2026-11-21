@@ -572,3 +572,24 @@ kbd { font: 500 10.5px/1 var(--mono); padding: 3px 5px; border-radius: 5px; bord
 .envbadge.live { border-color: rgba(255,92,138,.6); color: var(--down); box-shadow: 0 0 12px rgba(255,92,138,.35); }
 .spin { animation: spin 1s linear infinite; }
 @media (min-width: 960px) { .envbadge { left: calc(50% + 124px); } }
+
+/* ---------- living background: drifting aurora, moving grid, shimmer, tilt parallax ---------- */
+.bgfx .g1, .bgfx .g2, .bgfx .g3 { will-change: transform; }
+.bgfx .g1 { animation: drift1 38s ease-in-out infinite alternate; }
+.bgfx .g2 { animation: drift2 46s ease-in-out infinite alternate; }
+.bgfx .g3 { animation: drift3 54s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate3d(18vw, 14vh, 0) scale(1.15); } }
+@keyframes drift2 { to { transform: translate3d(-22vw, 18vh, 0) scale(.9); } }
+@keyframes drift3 { to { transform: translate3d(14vw, -20vh, 0) scale(1.2); } }
+.bgfx .g4 { position: absolute; left: 20%; top: 35%; width: 90vw; height: 90vw; max-width: 520px; max-height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(60,255,180,.09), rgba(60,255,180,0) 62%); animation: drift4 62s ease-in-out infinite alternate; will-change: transform; }
+@keyframes drift4 { from { transform: translate3d(-10vw, -10vh, 0); } to { transform: translate3d(12vw, 8vh, 0) scale(1.25); } }
+.bgfx .grid { animation: gridmove 24s linear infinite; }
+@keyframes gridmove { to { background-position: 24px 24px, 24px 24px; } }
+.bgfx .shim { position: absolute; inset: -20%; background: linear-gradient(115deg, transparent 40%, rgba(157,246,255,.035) 48%, rgba(255,60,200,.03) 52%, transparent 60%); animation: shimmer 14s ease-in-out infinite; will-change: transform; }
+@keyframes shimmer { from { transform: translate3d(-40%, 0, 0); } to { transform: translate3d(40%, 0, 0); } }
+.bgfx { transform: translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -10px), 0); transition: transform .4s ease-out; }
+/* sparkline draw-in */
+.draw path:last-of-type { stroke-dasharray: 1200; stroke-dashoffset: 1200; animation: draw 1.4s var(--ease) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+/* calm mode: reduced motion or battery saver */
+html.calm .bgfx *, html.calm .bgfx { animation: none !important; transition: none !important; }

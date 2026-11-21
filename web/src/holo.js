@@ -49,7 +49,7 @@ export function Spark({ pts, w = 100, h = 24, color, holo = false, fill = false,
   for (let i = 1; i < v.length; i++) { const x0 = X(i - 1), x1 = X(i), xm = (x0 + x1) / 2; d += ` C${xm.toFixed(1)} ${Y(v[i - 1]).toFixed(1)} ${xm.toFixed(1)} ${Y(v[i]).toFixed(1)} ${x1.toFixed(1)} ${Y(v[i]).toFixed(1)}`; }
   const up = v.at(-1) >= v[0];
   const c = color || (up ? '#3CFFB4' : '#FF5C8A');
-  return html`<svg class=${cls} width=${w} height=${h} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="none" style="overflow:visible">
+  return html`<svg class=${`${cls} draw`} width=${w} height=${h} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="none" style="overflow:visible">
     <defs>
       <linearGradient id=${id} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF3CC8"/><stop offset=".5" stop-color="#7A5CFF"/><stop offset="1" stop-color="#00D2FF"/></linearGradient>
       <linearGradient id=${id + 'f'} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${holo ? '#7A5CFF' : c} stop-opacity=".35"/><stop offset="1" stop-color=${holo ? '#7A5CFF' : c} stop-opacity="0"/></linearGradient>
