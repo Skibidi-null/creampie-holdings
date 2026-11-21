@@ -311,7 +311,7 @@ export function Chart({ sym, tf = '3M', mode = 'area', ind = ['vol'], alerts = [
   const lv = level(src, 10 * 60e3);
   const L = legend && legend.b;
   return html`<div class="lwc" style=${{ height: height + 'px' }}>
-    <div ref=${box} style=${{ position: 'absolute', inset: 0 }}></div>
+    <div ref=${box} style=${{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}></div>
     <div class="legend2">${L ? html`<span>O <b>${fmtPrice(L.open, sym)}</b></span><span>H <b>${fmtPrice(L.high, sym)}</b></span><span>L <b>${fmtPrice(L.low, sym)}</b></span><span>C <b>${fmtPrice(L.close, sym)}</b></span><span class=${L.close >= L.open ? 'up' : 'down'}>${legend.chg >= 0 ? '+' : ''}${legend.chg.toFixed(2)}%</span>${L.volume ? html`<span>Vol <b>${fmtVol(L.volume)}</b></span>` : ''}`
       : html`<span><i style=${{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', marginRight: '5px', background: lv === 'ok' ? 'var(--up)' : lv === 'bad' ? 'var(--down)' : 'var(--warn)' }}></i>${crypto ? 'Coinbase' : 'CNBC'}${health[src] && health[src].at ? ' · ' + ageTxt(health[src].at) : ''}</span>${draw ? html`<span class="gold">${draw === 'hline' ? 'Tap the chart to place a line' : 'Tap two points for a trend line'}</span>` : ''}`}</div>
     <div class="hintline">pinch · drag · double-tap to reset</div>
@@ -402,7 +402,7 @@ export function SeriesChart({ data, height = 220, fmt = (v) => v.toFixed(2), col
     for (const e of extra) { const x = s.ch.addSeries(s.L.LineSeries, { color: e.color, lineWidth: 1.5, lastValueVisible: false, priceLineVisible: false, priceFormat: { type: 'custom', formatter: fmt } }); const ep = []; for (const [t, v] of e.data) { const tt = Math.floor(t / 1000); if (v != null && (!ep.length || tt > ep.at(-1).time)) ep.push({ time: tt, value: v }); } x.setData(ep); s.all.push(x); }
     s.ch.timeScale().fitContent();
   }, [ready, data, extra.length]);
-  return html`<div class="lwc" style=${{ height: height + 'px' }}><div ref=${box} style="position:absolute;inset:0"></div>
+  return html`<div class="lwc" style=${{ height: height + 'px' }}><div ref=${box} style="position:absolute;top:0;right:0;bottom:0;left:0"></div>
     <div class="legend2">${tip ? html`<span><b>${fmt(tip.v)}</b> · ${new Date(tip.t * 1000).toLocaleDateString()}</span>` : ''}${extra.map((e) => html`<span style=${{ color: e.color }}>— ${e.name}</span>`)}</div>
     <div class="hintline">pinch · drag · double-tap to reset</div>
     ${!ready && html`<div class="loading"><div class="shimmer"></div></div>`}</div>`;
