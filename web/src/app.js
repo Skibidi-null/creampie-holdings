@@ -1,3 +1,4 @@
+import './polyfill.js';
 import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { html, Toaster, toast, sheets } from './ui.js';
