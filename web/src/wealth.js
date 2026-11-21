@@ -155,6 +155,7 @@ export function Projection({ s, onSetTarget }) {
     <${PaceChart} p=${p} />
     <div class="kv" style="margin-top:6px">
       <span>Spent on card (1 to ${p.day} ${monthShort})</span><${Money} v=${p.spent} />
+      ${p.oneOff > 0 && html`<span>One-off (gold, corrections), not in the pace</span><${Money} v=${p.oneOff} />`}
       <span>Daily average (÷ ${p.day} day${p.day === 1 ? '' : 's'})</span><${Money} v=${p.perDay} />
       <span>Days left in month</span><span>${p.daysLeft}</span>
       <span>Expected in remaining days</span><${Money} v=${p.extra} />

@@ -269,18 +269,19 @@ export function cardProjection(s, ym = thisYm()) {
   const day = isNow ? Number(t.slice(8)) : dim;
   const days = [];
   for (let i = 0; i < dim; i++) days.push(0);
-  let spent = 0;
+  let spent = 0, oneOff = 0;
   for (const x of s.txns) {
     if (x.from !== CARD || ymOf(x.date) !== ym || x.date > t) continue;
     spent += x.amt;
+    if (x.t === 'gold' || x.t === 'adj') oneOff += x.amt; // one-off buys and corrections don't set the daily pace
     days[Number(x.date.slice(8)) - 1] += x.amt;
   }
-  const perDay = day ? spent / day : 0;
+  const perDay = day ? (spent - oneOff) / day : 0;
   const daysLeft = dim - day;
   const projected = spent + perDay * daysLeft;
   const target = s.card.target || 0;
   return {
-    ym, spent, day, dim, daysLeft, perDay, projected, days,
+    ym, spent, oneOff, day, dim, daysLeft, perDay, projected, days,
     extra: perDay * daysLeft,
     owedEnd: cardOwed(s) + perDay * daysLeft,
     target,
