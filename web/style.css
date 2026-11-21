@@ -125,7 +125,7 @@ a.btn { text-decoration: none; }
 /* ---------- HOLO card: iridescent edge, conic glow, light sweep ---------- */
 .holo { position: relative; border-radius: 26px; padding: 1.2px; background: var(--holo); margin-bottom: 14px; box-shadow: 0 18px 50px -20px rgba(122,92,255,.55); }
 .holo > .in { position: relative; border-radius: 25px; overflow: hidden; background: linear-gradient(140deg, #161427 0%, #0C0C18 55%, #07070E 100%); padding: 20px; min-height: 100%; isolation: isolate; }
-.holo .orbglow { position: absolute; right: -70px; top: -70px; width: 230px; height: 230px; border-radius: 50%; background: conic-gradient(from var(--ang, 90deg), rgba(255,60,200,.22), rgba(0,210,255,.22), rgba(60,255,180,.18), rgba(255,227,110,.14), rgba(255,60,200,.22)); filter: blur(2px); z-index: -1; transition: transform .6s var(--ease); }
+.holo .orbglow { position: absolute; right: -70px; top: -70px; width: 230px; height: 230px; border-radius: 50%; background: conic-gradient(from var(--ang, 90deg), rgba(255,60,200,.22), rgba(0,210,255,.22), rgba(60,255,180,.18), rgba(255,227,110,.14), rgba(255,60,200,.22)); z-index: -1; transition: transform .6s var(--ease); }
 .holo .foil { position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen; opacity: .9;
   background: linear-gradient(var(--fa, 115deg), transparent 0%, transparent calc(var(--fx, 30%) - 18%), rgba(255,60,200,.10) calc(var(--fx, 30%) - 9%), rgba(255,255,255,.16) var(--fx, 30%), rgba(0,210,255,.12) calc(var(--fx, 30%) + 9%), rgba(60,255,180,.06) calc(var(--fx, 30%) + 16%), transparent calc(var(--fx, 30%) + 24%), transparent 100%); }
 .holo .sweep { position: absolute; top: -60px; left: 0; width: 70px; height: 400px; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.13), rgba(255,255,255,0)); animation: sweep 5.5s ease-in-out infinite; }
@@ -180,8 +180,8 @@ a.btn { text-decoration: none; }
 .tiles.four .tile .nm { margin: 0; font-size: 11px; color: #E6E7F2; line-height: 1.15; }
 
 /* ---------- bottom bar with holographic orb ---------- */
-.dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--safe-b)); z-index: 20; width: calc(100% - 28px); max-width: 532px; height: 66px; border-radius: 24px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: rgba(14,14,24,.88); border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
-@supports (backdrop-filter: blur(1px)) { .dock { background: rgba(14,14,24,.72); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); } }
+.dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--safe-b)); z-index: 20; width: calc(100% - 28px); max-width: 532px; height: 66px; border-radius: 24px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: linear-gradient(180deg, rgba(20,19,34,.97), rgba(10,10,18,.97)); border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+
 .dock > button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--mute); font-size: 11px; padding: 8px 0; position: relative; transition: color .2s; }
 .dock > button .i { line-height: 0; transition: transform .25s var(--ease); }
 .dock > button.on { color: var(--text); }
@@ -189,7 +189,7 @@ a.btn { text-decoration: none; }
 .dock > button.on::after { content: ''; position: absolute; bottom: 1px; width: 16px; height: 2px; border-radius: 2px; background: var(--holo); box-shadow: 0 0 10px rgba(0,210,255,.7); }
 .orb { justify-self: center; position: relative; width: 58px; height: 58px; margin-top: -22px; border: 0; padding: 0; background: none; border-radius: 50%; }
 .orb .ring { position: absolute; inset: 0; border-radius: 50%; background: var(--holo-conic); animation: spin 8s linear infinite; box-shadow: 0 0 24px rgba(122,92,255,.55), 0 0 40px rgba(0,210,255,.25); }
-.orb .ring::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: inherit; filter: blur(10px); opacity: .45; }
+.orb .ring { will-change: transform; }
 .orb .core { position: absolute; inset: 4px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #1B1830, #0B0B12 70%); display: grid; place-items: center; color: #fff; z-index: 1; }
 .orb .core svg { transition: transform .35s var(--ease); }
 .orb.open .core svg { transform: rotate(45deg); }
@@ -199,7 +199,7 @@ a.btn { text-decoration: none; }
 
 /* orb menu */
 .orbmenu { position: fixed; inset: 0; z-index: 19; background: rgba(4,4,7,.72); animation: fade .2s; }
-@supports (backdrop-filter: blur(1px)) { .orbmenu { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); } }
+.orbmenu { background: rgba(4,4,7,.86); }
 .orbmenu .items { position: absolute; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); width: calc(100% - 32px); max-width: 520px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .orbmenu .items button { border-radius: 20px; padding: 14px 8px; background: linear-gradient(160deg, rgba(255,255,255,.11), rgba(255,255,255,.03)); border: 1px solid var(--line2); color: var(--text); display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12.5px; animation: pop .34s var(--ease) both; }
 .orbmenu .items button .ic { color: var(--ice); }
@@ -410,7 +410,7 @@ select.input option { background: #12121C; }
 /* gold tabs (sticky segmented) */
 .tabs5 { position: sticky; top: calc(var(--safe-t) + 6px); z-index: 5; margin: 4px 0 8px; }
 .tabs5 .seg { background: rgba(14,14,24,.9); }
-@supports (backdrop-filter: blur(1px)) { .tabs5 .seg { background: rgba(14,14,24,.7); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); } }
+
 .tabs5 .seg button { padding: 9px 2px; font-size: 12px; }
 
 /* outlook */
