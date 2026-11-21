@@ -1,5 +1,5 @@
 // Creampie Holdings service worker: offline app shell + push alerts (iPhone/desktop).
-const V = '20261121052641';
+const V = '20261121052831';
 const SHELL = ['./', 'index.html', 'app.js', 'desktop.js', 'style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png', 'icons/badge.png', 'fonts/grotesk.woff2', 'fonts/mono.woff2'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -7,6 +7,8 @@ self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
   if (/(news|macro|version)\.json$/.test(u.pathname)) { const nm = u.pathname.split('/').pop(); e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(V).then((c) => c.put(nm, cp)); } return r; }).catch(() => caches.match(nm).then((h) => h || new Response('{"items":[]}', { headers: { 'Content-Type': 'application/json' } })))); return; }
+  // the page itself: network first (so a new version shows on the first open), cache when offline
+  if (e.request.mode === 'navigate' || u.pathname.endsWith('/') || u.pathname.endsWith('index.html')) { e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(V).then((c) => c.put('index.html', cp)); } return r; }).catch(() => caches.match('index.html'))); return; }
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request).then((r) => {
     if (r.ok && u.pathname.match(/\.(js|css|png|svg|woff2|json|webmanifest)$/)) { const cp = r.clone(); caches.open(V).then((c) => c.put(e.request, cp)); }
     return r;
