@@ -24,6 +24,14 @@ class Bridge(private val act: MainActivity) {
         Widget.refresh(ctx)
     }
 
+    @JavascriptInterface fun appVersion(): String = Updater.versionName(ctx) + " (" + Updater.versionCode(ctx) + ")"
+    @JavascriptInterface fun checkUpdate(manual: Boolean) = Updater.check(ctx, manual)
+    @JavascriptInterface fun downloadUpdate() = Updater.download(ctx)
+    @JavascriptInterface fun installUpdate() = Updater.install(ctx)
+    @JavascriptInterface fun updateLater() = Updater.later(ctx)
+    @JavascriptInterface fun openInstallPermission() = Updater.openPermission(ctx)
+    @JavascriptInterface fun vibrate(ms: Int) { runCatching { (ctx.getSystemService(android.os.Vibrator::class.java))?.vibrate(android.os.VibrationEffect.createOneShot(ms.toLong().coerceIn(5, 600), android.os.VibrationEffect.DEFAULT_AMPLITUDE)) } }
+
     @JavascriptInterface
     fun notify(title: String, body: String) {
         Notifier.send(ctx, Notifier.CH_GOLD, 7001, title, body, "gold")
@@ -58,7 +66,7 @@ class Bridge(private val act: MainActivity) {
                 c.connectTimeout = 15000; c.readTimeout = 20000
                 c.setRequestProperty("Authorization", auth)
                 c.setRequestProperty("Accept", "application/json")
-                c.setRequestProperty("User-Agent", "CreampieAndroid/1.2")
+                c.setRequestProperty("User-Agent", "CreampieAndroid/2.0")
                 if (body.isNotEmpty() && method == "POST") {
                     c.doOutput = true
                     c.setRequestProperty("Content-Type", "application/json")

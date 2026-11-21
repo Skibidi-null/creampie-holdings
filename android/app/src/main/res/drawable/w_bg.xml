@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HOLO widget card: iridescent 1dp edge around a dark glass panel -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#FFFF3CC8" android:centerColor="#FF00D2FF" android:endColor="#FF3CFFB4" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+    <item android:left="1.2dp" android:top="1.2dp" android:right="1.2dp" android:bottom="1.2dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:startColor="#FF171429" android:centerColor="#FF0C0C18" android:endColor="#FF06060C" />
+            <corners android:radius="21dp" />
+        </shape>
+    </item>
+</layer-list>

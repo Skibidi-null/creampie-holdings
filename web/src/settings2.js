@@ -12,6 +12,7 @@ import { useHealth, SOURCES, level, ageTxt } from './data.js';
 import { Light } from './holo.js';
 import { feedback, sound } from './fx.js';
 import { refreshRates } from './gold.js';
+import { nativeVersion, checkUpdate } from './updater.js';
 
 const back = () => history.back();
 const SECS = [['budget', 'Budget and spending'], ['wealth', 'Wealth and net worth'], ['markets', 'Markets and trading'], ['gold', 'Gold']];
@@ -71,6 +72,7 @@ export function Settings() {
 
     <div class="sect"><span class="h-title">App</span></div>
     <div class="card">
+      ${isNative() && html`<${SettingRow} title="App version" hint=${nativeVersion() || ''} onClick=${checkUpdate}><span class="ice">Check for update</span><//>`}
       <${SettingRow} title="Data health" hint="Status of every price and data source" onClick=${() => (location.hash = '#/health')}><span class="ice">Open</span><//>
       <${SettingRow} title="Backup" hint=${`Encrypted backup file. Last: ${st.lastBackup ? niceDate(typeof st.lastBackup === 'number' ? new Date(st.lastBackup).toISOString().slice(0, 10) : st.lastBackup) : 'never'}`} onClick=${() => (location.hash = '#/backup')}><span class="ice">Open</span><//>
       <${SettingRow} title="Categories" hint="Add your own spending categories" onClick=${() => setCatSheet(true)}><span class="ice">Edit</span><//>

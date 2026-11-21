@@ -7,7 +7,12 @@ import { get, cardOwed, dailyLimit, monthStats, onSaved, set } from './store.js'
 import { thisYm } from './util.js';
 import { VAPID_PUBLIC, CFG_PUBLIC, TOPIC } from './keys.js';
 import { live } from './gold.js';
-import { STYLES } from './advisor.js';
+import { STYLES, todaysCall } from './advisor.js';
+import { fullNetWorth } from './networth.js';
+import { A } from './assets.js';
+import { riskMeter } from './sessions.js';
+import { nextAlert, describe } from './alerts.js';
+import { money, DISP } from './util.js';
 
 export const isNative = () => !!window.CPNative;
 export const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -22,6 +27,32 @@ function weekly(s) {
   const nm = (sym) => ((s.markets.list || []).find((x) => x.sym === sym) || {}).name || sym;
   return { nwPct: now && wk && wk.v ? Math.round(((now.v - wk.v) / Math.abs(wk.v)) * 1000) / 10 : null, calls: Object.values(last).slice(0, 5).map((c) => `${nm(c.sym)} ${c.v.replace('sbuy', 'strong buy').replace('ssell', 'strong sell')}`) };
 }
+
+// data for the Android home-screen widgets (formatted in the display currency)
+const callCache = { list: [] };
+export function widgetV2(s, dl) {
+  try {
+    const nw = fullNetWorth(s, live.price || 0);
+    const keep = DISP.cur; DISP.cur = s.settings.curSec && s.settings.curSec.wealth || s.settings.cur || 'PLN';
+    const nwTxt = money(nw.total, 'PLN', 0); const curW = DISP.cur;
+    DISP.cur = s.settings.curSec && s.settings.curSec.budget || s.settings.cur || 'PLN';
+    const leftTxt = dl ? money(Math.abs(dl.monthLeft), 'PLN', 0) : null; const todayTxt = dl ? money(Math.abs(dl.left), 'PLN', 0) : null;
+    DISP.cur = keep;
+    const hist = (s.nwHist || []).slice(-30).map((x) => x.v);
+    const prev = (s.nwHist || []).filter((x) => x.d < new Date().toISOString().slice(0, 10)).at(-1);
+    const rm = riskMeter(); const na = nextAlert();
+    const calls = (callCache.list || []).map((r) => ({ sym: r.sym, name: ((s.markets.list || []).find((w) => w.sym === r.sym) || {}).name || r.sym, score: r.score, v: r.verdict.label }));
+    return {
+      v2: 1, cur: curW, nwTxt, nwSpark: hist, nwPct: prev && prev.v ? ((nw.total - prev.v) / Math.abs(prev.v)) * 100 : null,
+      calls, watch: (s.markets.list || []).slice(0, 12).map((w) => { const q = A.q[w.sym]; return { sym: w.sym, name: w.name || w.sym, last: q ? q.last : null, pct: q ? q.pct : null }; }),
+      risk: rm ? { score: rm.score, label: rm.label } : null,
+      budget: dl ? { monthLeft: dl.monthLeft, budget: dl.budget, daysLeft: dl.daysLeft, leftTxt, todayTxt, over: dl.left < 0, used: dl.budget ? Math.max(0, Math.min(1, 1 - dl.monthLeft / dl.budget)) : null } : null,
+      next: na ? { text: `${na.al.name || na.al.sym}: ${describe(na.al).toLowerCase()}`, dist: Math.round(na.d * 10) / 10 } : null,
+    };
+  } catch (e) { return {}; }
+}
+todaysCall().then((t) => { callCache.list = t.list || []; }).catch(() => {});
+setInterval(() => todaysCall().then((t) => { callCache.list = t.list || []; }).catch(() => {}), 10 * 60e3);
 
 function config() {
   const s = get();
@@ -47,6 +78,7 @@ function config() {
       month: monthStats(s, thisYm()).spend,
       gold: live.price || null,
       privacy: !!s.settings.privacy,
+      ...widgetV2(s, dl),
     },
   };
 }

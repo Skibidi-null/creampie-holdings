@@ -14,6 +14,7 @@ import { AdvisorScreen } from './advisorScreen.js';
 import { World } from './world.js';
 import { AlertsScreen, startAlerts } from './alertsScreen.js';
 import { alertBus2 } from './alerts.js';
+import { UpdateSheet } from './updater.js';
 import { NetWorthScreen } from './wealthPlus.js';
 import { Settings as Settings2, Backup as Backup2, Health } from './settings2.js';
 import { WealthTab, PortfolioHub, Benchmark, RiskCheck, Dividends, Tax, Freedom, Dca, WhatIf, Journal, Fees } from './invest.js';
@@ -198,6 +199,7 @@ function App() {
   return html`<div>
     <div key=${r.name}>${Screen()}</div>
     <${EnvBadge} />
+    <${UpdateSheet} />
     <${Dock} tab=${tab || (TABS.includes(r.name) ? r.name : '')} onAdd=${() => { vibrate(15); openAdd('exp'); }} />
     ${sheet && html`<${AddSheet} ...${sheet} onClose=${() => setSheet(null)} />`}
     <${Toaster} />

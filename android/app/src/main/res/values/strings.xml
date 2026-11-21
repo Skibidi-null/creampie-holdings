@@ -2,5 +2,22 @@
 <resources>
     <string name="sc_add">Add expense</string>
     <string name="sc_gold">Gold</string>
-    <string name="widget_desc">Today\'s spending and live gold</string>
+    <string name="widget_desc">Budget left and today\'s spending</string>
+    <string name="w_budget_old">Budget (classic)</string>
+    <string name="w_nw">Net worth</string>
+    <string name="wd_nw">Net worth with sparkline</string>
+    <string name="w_signal">Signal</string>
+    <string name="wd_signal">Advisor gauge for one asset</string>
+    <string name="w_watch">Watchlist</string>
+    <string name="wd_watch">Your assets and today\'s moves</string>
+    <string name="w_risk">Risk on/off</string>
+    <string name="wd_risk">The market mood meter</string>
+    <string name="w_ticker">Ticker</string>
+    <string name="wd_ticker">One price, any asset</string>
+    <string name="w_markets">Markets now</string>
+    <string name="wd_markets">Which exchanges are open</string>
+    <string name="w_budget">Budget</string>
+    <string name="wd_budget">Money left this month</string>
+    <string name="w_alert">Next alert</string>
+    <string name="wd_alert">Your closest price alert</string>
 </resources>

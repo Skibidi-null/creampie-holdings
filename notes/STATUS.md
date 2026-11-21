@@ -90,3 +90,5 @@ Brief: notes/BRIEF-v2.md (incl. user answers + locked additions at the bottom).
 ## Phase 6: todo widgets, updater, APK v2.0, emulator tests
 ## Testing harness
 - scratchpad pp/shots.mjs (puppeteer) + seed-v1.json sample data (fake numbers only)
+## Phase 4 job: DONE (commit "v2 phase 4"). push.js config now sends alerts[] (v2), quiet, style, sunday, dca, backup, widget v2 data (nwTxt, nwSpark, calls, watch, risk, budget, next).
+## Phase 6 (Android) IN PROGRESS: plan = Updater (native download/verify/install, web sheet UI via window.cpUpdate), AlertWorker v2 (alerts kinds + TechScore.kt port + quiet + sunday + dca), 8 widgets (TextViews + small bitmaps for spark/gauge/meter, size classes via onAppWidgetOptionsChanged), configure activity for Signal/Ticker, versionName 2.0 / versionCode 4, publish docs/android/{version.json, CreampieHoldings-2.0.apk}.

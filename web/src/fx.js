@@ -51,7 +51,7 @@ export function sound(name) {
     (SOUNDS[name] || SOUNDS.tap)(c);
   } catch {}
 }
-export const haptic = (p = 10) => { try { if (get().settings.vibrate !== false && navigator.vibrate) navigator.vibrate(p); } catch {} };
+export const haptic = (p = 10) => { try { if (get().settings.vibrate === false) return; if (window.CPNative && window.CPNative.vibrate) window.CPNative.vibrate(Array.isArray(p) ? p.reduce((a, b, i) => a + (i % 2 ? 0 : b), 0) : p); else if (navigator.vibrate) navigator.vibrate(p); } catch {} };
 export const feedback = (name) => {
   sound(name);
   haptic({ buy: [12, 40, 18], sell: [18, 40, 12], set: 14, alert: [30, 60, 30, 60, 30], error: [60, 40, 60] }[name] || 8);

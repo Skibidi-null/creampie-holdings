@@ -84,7 +84,7 @@ class MainActivity : FragmentActivity() {
                 return true
             }
             override fun onPageFinished(view: WebView, url: String) {
-                if (url.startsWith(SITE)) loaded = true
+                if (url.startsWith(SITE)) { if (!loaded) web.postDelayed({ Updater.check(this@MainActivity, false) }, 4000); loaded = true }
             }
             override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
                 if (req.isForMainFrame && !loaded) showOffline()
@@ -100,7 +100,7 @@ class MainActivity : FragmentActivity() {
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val js = "(function(){var h=(location.hash||'#/home').split('/')[1]||'home';if(history.state&&history.state.sheet)return 'back';if(['home','gold','markets','wealth'].indexOf(h)<0)return 'back';return h==='home'?'exit':'home';})()"
+                val js = "(function(){var h=(location.hash||'#/home').split('/')[1]||'home';if(history.state&&history.state.sheet)return 'back';if(['home','markets','wealth','more'].indexOf(h)<0)return 'back';return h==='home'?'exit':'home';})()"
                 web.evaluateJavascript(js) { r ->
                     when {
                         r.contains("exit") -> finish()
@@ -116,6 +116,7 @@ class MainActivity : FragmentActivity() {
         else web.loadUrl(SITE + hashFor(intent))
         (application as App).schedule()
         askNotificationPermission()
+        Updater.emit = { o -> runJs("window.cpUpdate&&window.cpUpdate(" + o.toString() + ")") }
     }
 
     private fun hashFor(i: Intent?): String = when (val o = i?.getStringExtra("open")) {
@@ -134,6 +135,8 @@ class MainActivity : FragmentActivity() {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
     }
+
+    override fun onResume() { super.onResume(); Updater.onResume(this) }
 
     override fun onPause() {
         super.onPause()
@@ -156,7 +159,7 @@ class MainActivity : FragmentActivity() {
         })
         prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
             .setTitle("Creampie Holdings")
-            .setSubtitle("Touch to get in")
+            .setSubtitle("Unlock with your fingerprint")
             .setNegativeButtonText("Use PIN")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
             .build())
@@ -164,9 +167,9 @@ class MainActivity : FragmentActivity() {
 
     private fun showOffline() {
         val html = """<html><body style="background:#040407;color:#F4F5FA;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px">
-            <div style="font-size:54px">🔌</div><h2 style="color:#ff7ab8">No connection</h2>
-            <p style="color:#b49bb5">Creampie needs the internet the very first time it opens. After that it works offline.</p>
-            <button onclick="location.href='$SITE#/home'" style="margin-top:12px;background:#1f6b57;color:#fff;border:0;border-radius:14px;padding:14px 26px;font-size:16px">Try again</button></body></html>"""
+            <h2 style="color:#9DF6FF">No connection</h2>
+            <p style="color:#A9ABC8">Creampie needs the internet the very first time it opens. After that it works offline.</p>
+            <button onclick="location.href='$SITE#/home'" style="margin-top:12px;background:linear-gradient(90deg,#FF3CC8,#7A5CFF,#00D2FF);color:#fff;border:0;border-radius:14px;padding:14px 26px;font-size:16px">Try again</button></body></html>"""
         web.loadDataWithBaseURL(SITE, html, "text/html", "utf-8", null)
     }
 }

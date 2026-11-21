@@ -44,6 +44,34 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
         return c.inputStream.bufferedReader().use { it.readText() }
     }
 
+    /** Last price and today's % change (CNBC or Coinbase 24h). */
+    private fun quoteFull(sym: String): Pair<Double, Double?>? = try {
+        if (Regex("^[A-Z0-9]+-USD$").matches(sym)) { val st = JSONObject(get("https://api.exchange.coinbase.com/products/$sym/stats")); val last = st.getString("last").toDouble(); val open = st.getString("open").toDouble(); last to (if (open > 0) (last - open) / open * 100 else null) }
+        else {
+            val u = "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=" + java.net.URLEncoder.encode(sym, "UTF-8") + "&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json"
+            val q = JSONObject(getUA(u, "Mozilla/5.0 (Linux; Android 14) Mobile")).getJSONObject("FormattedQuoteResult").getJSONArray("FormattedQuote").getJSONObject(0)
+            val last = q.optString("last").replace(",", "").toDoubleOrNull()
+            last?.let { it to q.optString("change_pct").replace("%", "").replace("+", "").replace(",", "").toDoubleOrNull() }
+        }
+    } catch (_: Exception) { null }
+
+    /** About 600 days of daily bars (CNBC or Coinbase). */
+    private fun dailyBars(sym: String): List<TechScore.Bar> = try {
+        if (Regex("^[A-Z0-9]+-USD$").matches(sym)) {
+            val out = java.util.TreeMap<Long, TechScore.Bar>(); val end = System.currentTimeMillis()
+            for (k in 0..1) { val e = end - k * 300 * 86400_000L; val b = e - 300 * 86400_000L
+                val arr = JSONArray(get("https://api.exchange.coinbase.com/products/$sym/candles?granularity=86400&start=${java.time.Instant.ofEpochMilli(b)}&end=${java.time.Instant.ofEpochMilli(e)}"))
+                for (i in 0 until arr.length()) { val x = arr.getJSONArray(i); out[x.getLong(0)] = TechScore.Bar(x.getDouble(2), x.getDouble(1), x.getDouble(4), x.getDouble(5)) } }
+            out.values.toList()
+        } else {
+            val f = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(java.time.ZoneOffset.UTC)
+            val u = "https://ts-api.cnbc.com/harmony/app/bars/" + java.net.URLEncoder.encode(sym, "UTF-8").replace("+", "%20") + "/1D/" + f.format(java.time.Instant.now().minusSeconds(600L * 86400)) + "/" + f.format(java.time.Instant.now().plusSeconds(86400)) + "/adjusted/EST5EDT.json"
+            val arr = JSONObject(getUA(u, "Mozilla/5.0 (Linux; Android 14) Mobile")).getJSONObject("barData").getJSONArray("priceBars")
+            (0 until arr.length()).mapNotNull { i -> val x = arr.getJSONObject(i); val c = x.optString("close").toDoubleOrNull() ?: return@mapNotNull null
+                TechScore.Bar(x.optString("high").toDoubleOrNull() ?: c, x.optString("low").toDoubleOrNull() ?: c, c, x.optDouble("volume", 0.0)) }
+        }
+    } catch (_: Exception) { emptyList() }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val ctx = applicationContext
         val prefs = Store.prefs(ctx)
@@ -152,28 +180,76 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             } catch (_: Exception) {}
         }
 
-        // ---- watchlist price alerts ----
-        val mk = cfg.optJSONObject("markets")
-        val als = mk?.optJSONArray("alerts")
-        if (mk != null && mk.optBoolean("on", true) && als != null && als.length() > 0) {
-            val wa = try { JSONObject(prefs.getString("wa", "{}")) } catch (_: Exception) { JSONObject() }
+        // ---- price and signal alerts v2 ----
+        val quietCfg = cfg.optJSONObject("quiet")
+        val quiet = quietCfg != null && quietCfg.optBoolean("on") && run { val f = quietCfg.optInt("from", 23); val t = quietCfg.optInt("to", 7); val h = local.hour; if (f > t) h >= f || h < t else h in f until t }
+        val als = cfg.optJSONArray("alerts")
+        val qcache = HashMap<String, Double?>()
+        fun px(sym: String) = qcache.getOrPut(sym) { assetPrice(sym) }
+        if (als != null && als.length() > 0) {
+            val st = try { JSONObject(prefs.getString("al2", "{}")) } catch (_: Exception) { JSONObject() }
             var n = 0
             for (i in 0 until als.length()) {
                 val al = als.getJSONObject(i)
-                val sym = al.optString("sym"); val name = al.optString("name", sym)
-                val above = al.optDouble("above", 0.0).let { if (it.isNaN()) 0.0 else it }
-                val below = al.optDouble("below", 0.0).let { if (it.isNaN()) 0.0 else it }
-                val px = assetPrice(sym) ?: continue
-                val st = wa.optJSONObject(sym) ?: JSONObject()
-                fun f(v: Double) = if (v >= 1) String.format("%.2f", v) else String.format("%.6f", v)
-                if (above > 0 && px >= above && !st.optBoolean("a")) { Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 40), "$name is above ${f(above)}", "Now ${f(px)}. Your price alert.", "asset/" + java.net.URLEncoder.encode(sym, "UTF-8")); st.put("a", true) }
-                if (above > 0 && px < above * 0.995) st.put("a", false)
-                if (below > 0 && px <= below && !st.optBoolean("b")) { Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 40), "$name dropped below ${f(below)}", "Now ${f(px)}. Your price alert.", "asset/" + java.net.URLEncoder.encode(sym, "UTF-8")); st.put("b", true) }
-                if (below > 0 && px > below * 1.005) st.put("b", false)
-                wa.put(sym, st)
+                val id = al.optString("id"); val sym = al.optString("sym"); val name = al.optString("name", sym); val kind = al.optString("kind")
+                val a = al.optDouble("a", 0.0).let { if (it.isNaN()) 0.0 else it }; val b = al.optDouble("b", 0.0).let { if (it.isNaN()) 0.0 else it }
+                val p = px(sym) ?: continue
+                val s0 = st.optJSONObject(id) ?: JSONObject()
+                fun f(v: Double) = if (v >= 1) String.format(java.util.Locale.US, "%,.2f", v) else String.format(java.util.Locale.US, "%.6f", v)
+                var side: Int? = null; var title = ""; var body = "Now ${f(p)}. Your alert."
+                when (kind) {
+                    "above" -> { side = if (p >= a) 1 else if (p < a * 0.997) 0 else s0.optInt("s", -1).takeIf { it >= 0 }; title = "$name is above ${f(a)}" }
+                    "below" -> { side = if (p <= a) 1 else if (p > a * 1.003) 0 else s0.optInt("s", -1).takeIf { it >= 0 }; title = "$name fell below ${f(a)}" }
+                    "enter", "leave" -> { val lo = minOf(a, b); val hi = maxOf(a, b); val inside = p in lo..hi; side = if (kind == "enter") (if (inside) 1 else 0) else (if (inside) 0 else 1)
+                        title = if (kind == "enter") "$name entered ${f(lo)} to ${f(hi)}" else "$name left ${f(lo)} to ${f(hi)}" }
+                    "move", "score" -> {
+                        val bars = dailyBars(sym); if (bars.size < 5) continue
+                        if (kind == "move") { val d = al.optInt("days", 1); if (bars.size <= d) continue; val ref = bars[bars.size - 1 - d].close; val ch = (p - ref) / ref * 100; val want = Math.abs(al.optDouble("pct", 5.0)); val dir = al.optString("dir", "both")
+                            side = if ((dir == "down" && ch <= -want) || (dir == "up" && ch >= want) || (dir == "both" && Math.abs(ch) >= want)) 1 else 0
+                            title = String.format(java.util.Locale.US, "%s %s %.1f%% in %s", name, if (ch >= 0) "up" else "down", Math.abs(ch), if (d == 1) "a day" else "$d days") }
+                        else { val live = bars.dropLast(1) + TechScore.Bar(maxOf(bars.last().high, p), minOf(bars.last().low, p), p, bars.last().volume); val sc = TechScore.score(live) ?: continue
+                            val sty = cfg.optJSONObject("style"); val buy = sty?.optInt("buy", 60) ?: 60; val sell = sty?.optInt("sell", 40) ?: 40
+                            val v = if (sc >= buy) 2 else if (sc <= sell) 0 else 1; val dir = al.optString("dir", "buy")
+                            title = "$name: technical signals now say ${if (v == 2) "Buy" else if (v == 0) "Sell" else "Hold"}"; body = "Technical score $sc/100. Open the app for the full advisor reasons."
+                            if (dir == "any") { val prev = s0.optInt("v", -1); if (prev >= 0 && prev != v && (!quiet || al.optBoolean("urgent"))) Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 60), title, body, "asset/" + java.net.URLEncoder.encode(sym, "UTF-8")); s0.put("v", v); st.put(id, s0); continue }
+                            side = if ((dir == "sell" && v == 0) || (dir != "sell" && v == 2)) 1 else 0 }
+                    }
+                    else -> continue
+                }
+                val prev = s0.optInt("s", -1)
+                if (side == 1 && prev == 0 && !(al.optBoolean("once") && s0.optBoolean("done"))) {
+                    if (!quiet || al.optBoolean("urgent")) Notifier.send(ctx, Notifier.CH_GOLD, 600 + (n++ % 60), title, body, "asset/" + java.net.URLEncoder.encode(sym, "UTF-8"))
+                    if (al.optBoolean("once")) s0.put("done", true)
+                }
+                if (side != null) s0.put("s", side)
+                st.put(id, s0)
             }
-            ed.putString("wa", wa.toString())
+            ed.putString("al2", st.toString())
         }
+
+        // ---- live quotes for the widgets (watchlist + chosen tickers) ----
+        try {
+            val w = cfg.optJSONObject("widget"); val syms = LinkedHashSet<String>()
+            w?.optJSONArray("watch")?.let { for (i in 0 until minOf(it.length(), 8)) syms += it.getJSONObject(i).optString("sym") }
+            for ((k, v) in prefs.all) if (k.startsWith("w_") && v is String) syms += v
+            for (sym in syms) { val q = quoteFull(sym) ?: continue; ed.putString("q_$sym", JSONObject().put("last", q.first).put("pct", q.second ?: JSONObject.NULL).put("at", now).toString()) }
+        } catch (_: Exception) {}
+
+        // ---- Sunday summary (Sunday 18:00) ----
+        val sun = cfg.optJSONObject("sunday")
+        if (sun != null && local.dayOfWeek == java.time.DayOfWeek.SUNDAY && local.hour == 18 && prefs.getString("sunday", "") != today) {
+            val parts = mutableListOf<String>()
+            if (!sun.isNull("nwPct")) parts += String.format(java.util.Locale.US, "Your net worth %s%.1f%% this week.", if (sun.optDouble("nwPct") >= 0) "+" else "", sun.optDouble("nwPct"))
+            val spx = dailyBars(".SPX"); val gl = dailyBars("@GC.1")
+            fun wk(b: List<TechScore.Bar>) = if (b.size > 6) (b.last().close / b[b.size - 6].close - 1) * 100 else null
+            listOfNotNull(wk(spx)?.let { String.format(java.util.Locale.US, "S&P 500 %+.1f%%", it) }, wk(gl)?.let { String.format(java.util.Locale.US, "gold %+.1f%%", it) }).takeIf { it.isNotEmpty() }?.let { parts += it.joinToString(", ") + " this week." }
+            sun.optJSONArray("calls")?.let { if (it.length() > 0) parts += "Advisor: " + (0 until it.length()).joinToString(", ") { k -> it.getString(k) } + "." }
+            if (parts.isNotEmpty()) Notifier.send(ctx, Notifier.CH_REMIND, 402, "Your Sunday summary", parts.joinToString(" "), "world/brief")
+            ed.putString("sunday", today)
+        }
+        // ---- DCA payday and weekly backup reminders ----
+        cfg.optJSONObject("dca")?.let { d -> if (local.hour == 9 && local.dayOfMonth == d.optInt("day", 10) && prefs.getString("dca", "") != today) { Notifier.send(ctx, Notifier.CH_REMIND, 403, "DCA day", "Time for your monthly investment. Open the app to buy.", "dca"); ed.putString("dca", today) } }
+        cfg.optJSONObject("backup")?.let { bk -> if (local.dayOfWeek == java.time.DayOfWeek.SATURDAY && local.hour == 11 && prefs.getString("bk", "") != today && now - bk.optLong("last", 0) > 7 * 86400_000L) { Notifier.send(ctx, Notifier.CH_REMIND, 404, "Time for a backup", "Your last encrypted backup is more than a week old.", "backup"); ed.putString("bk", today) } }
 
         // ---- credit card bill ----
         val card = cfg.optJSONObject("card")
@@ -185,7 +261,7 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             val key = "$due:$days"
             if (days in listOf(3, 1, 0) && prefs.getString("cardKey", "") != key) {
                 val name = card.optString("name", "Card")
-                Notifier.send(ctx, Notifier.CH_REMIND, 301, if (days == 0) "💳 $name bill due TODAY" else "💳 $name bill in $days day${if (days > 1) "s" else ""}", String.format("Amount to pay: %.2f zł", card.optDouble("owed")), "card")
+                Notifier.send(ctx, Notifier.CH_REMIND, 301, if (days == 0) "$name bill due today" else "$name bill in $days day${if (days > 1) "s" else ""}", String.format("Amount to pay: %.2f zł", card.optDouble("owed")), "card")
                 ed.putString("cardKey", key)
             }
         }
