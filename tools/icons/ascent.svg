@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+ <radialGradient id="bg" cx="0.5" cy="0.15" r="1"><stop offset="0" stop-color="#22183F"/><stop offset=".6" stop-color="#08070E"/><stop offset="1" stop-color="#020204"/></radialGradient>
+ <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF3CC8"/><stop offset=".33" stop-color="#7A5CFF"/><stop offset=".66" stop-color="#00D2FF"/><stop offset="1" stop-color="#FFE36E"/></linearGradient>
+ <linearGradient id="c1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#7A5CFF"/><stop offset="1" stop-color="#00D2FF"/></linearGradient>
+ <linearGradient id="c2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#00D2FF"/><stop offset="1" stop-color="#3CFFB4"/></linearGradient>
+</defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<path d="M512 150 L826 331 L826 693 L512 874 L198 693 L198 331 Z" fill="rgba(122,92,255,.10)" stroke="url(#ring)" stroke-width="26" stroke-linejoin="round"/>
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+ <path d="M352 700 L512 560 L672 700" stroke="#FF3CC8" stroke-width="44" opacity=".55"/>
+ <path d="M352 560 L512 420 L672 560" stroke="url(#c1)" stroke-width="44" opacity=".8"/>
+ <path d="M352 420 L512 280 L672 420" stroke="url(#c2)" stroke-width="44"/>
+</g>
+</svg>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { get, set, patch } from './store.js';
 import { today, addDays, sum, iso } from './util.js';
+import { mark } from './data.js';
 
 export const OZ = 31.1034768;
 const SPOT = 'https://api.gold-api.com/price/';
@@ -28,7 +29,8 @@ export async function refreshRates(force) {
     for (const c of RATE_CURS) if (!r[c] && j.rates[c] && pln) { r[c] = pln / j.rates[c]; src[c] = 'er'; }
     if (!date && j.time_last_update_unix) date = iso(new Date(j.time_last_update_unix * 1000));
   } catch {}
-  if (!r.USD) return s.rates; // offline: keep the last saved rates
+  if (!r.USD) { mark('fx', false, 'offline'); return s.rates; } // offline: keep the last saved rates
+  mark('fx', true);
   const next = { ...s.rates, ...r, src: { ...(s.rates.src || {}), ...src }, date: date || s.rates.date || null, at: Date.now() };
   patch('rates', next);
   return next;
@@ -64,7 +66,8 @@ export async function tick() {
     }
     live.dayOpen = dayOpenPrice();
     checkInAppAlerts(p);
-  } catch (e) { live.err = String(e.message || e); }
+    mark('gold', true);
+  } catch (e) { live.err = String(e.message || e); mark('gold', false, live.err); }
   emit();
 }
 
@@ -150,7 +153,8 @@ export function loadHistory() {
         return (await r.json()).map((x) => [x.data, x.cena]);
       } catch { return null; }
     }));
-    if (chunks.some((c) => c === null) && !history.data.length) throw new Error('offline');
+    if (chunks.some((c) => c === null) && !history.data.length) { mark('nbp', false, 'offline'); throw new Error('offline'); }
+    mark('nbp', !chunks.some((c) => c === null));
     const merged = new Map(history.data);
     for (const c of chunks) if (c) for (const [d, p] of c) merged.set(d, p);
     history.data = [...merged.entries()].sort((x, y) => x[0].localeCompare(y[0]));
@@ -277,7 +281,8 @@ export const NEWS_URL = 'https://skibidi-null.github.io/creampie-holdings/news.j
 export async function fetchNews() {
   const urls = location.hostname.endsWith('github.io') ? ['news.json'] : [NEWS_URL, 'news.json'];
   for (const u of urls) {
-    try { const r = await fetch(u + '?t=' + Math.floor(Date.now() / 300e3), { cache: 'no-store' }); if (r.ok) return await r.json(); } catch {}
+    try { const r = await fetch(u + '?t=' + Math.floor(Date.now() / 300e3), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); mark('news', true); return j; } } catch {}
   }
+  mark('news', false, 'offline');
   return null;
 }

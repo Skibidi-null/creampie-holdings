@@ -5,8 +5,15 @@ import { html, LineChart, Seg, Sheet, Field, NumInput, Switch, toast, SettingRow
 import { Icon } from './icons.js';
 import { useStore, get, patch } from './store.js';
 import { useAssetsLive, A, search, addWatch, removeWatch, moveWatch, nameOf, RANGES, useBars, bars, assetSignal, setAlert, fmtPrice, isCrypto, cleanSym, INDICES } from './assets.js';
-import { Spark } from './outlook.js';
-import { useT212, T212, setEnv, setRelay, saveCreds, forget, summary, positions, pendingOrders, cancelOrder, orderHistory, placeOrder, findInstrument, tickerToSym, T212Error } from './t212.js';
+import { Spark } from './holo.js';
+import { ChartCard, Depth } from './chart.js';
+import { SignalPanel } from './advisorScreen.js';
+import { useAnalysis } from './advisor.js';
+import { AlertSheet } from './alertsScreen.js';
+import { describe, updateAlert, KINDS } from './alerts.js';
+import { fearGreed } from './data.js';
+import { feedback } from './fx.js';
+import { T212C, useT212, T212, setEnv, setRelay, saveCreds, forget, summary, positions, pendingOrders, cancelOrder, orderHistory, placeOrder, findInstrument, tickerToSym, T212Error } from './t212.js';
 import { num, parseNum } from './util.js';
 
 const go = (r) => { location.hash = '#/' + r; };
@@ -15,7 +22,7 @@ const money = (v, cur = 'PLN', d = 2) => (v == null || !Number.isFinite(v) ? '�
 const statusTxt = (q) => !q ? '' : q.h24 ? '24h market' : q.status === 'REG_MKT' ? 'Market open' : q.status === 'PRE_MKT' ? 'Pre-market' : q.status === 'POST_MKT' ? 'After hours' : q.status ? 'Market closed' : '';
 
 // ---------- small hook: Trading 212 portfolio (positions + summary), refreshed while visible ----------
-const pf = { sum: null, pos: null, ord: null, at: 0, err: null };
+const pf = T212C;
 const pfSubs = new Set();
 async function refreshPortfolio(full) {
   if (!T212.connected) return;
@@ -132,43 +139,41 @@ export function Asset({ sym }) {
   const t = useT212();
   const p = usePortfolio(10000);
   const q = a.q[sym];
-  const [range, setRange] = useState('1D');
-  const ch = useBars(sym, range);
-  const daily = useBars(sym, '1Y');
-  const sig = useMemo(() => assetSignal(daily.pts, q && q.last, isCrypto(sym)), [daily.pts, q && Math.round(q.last * 100)]);
+  const an = useAnalysis(sym);
   const [sheet, setSheet] = useState(null);
   const [inst, setInst] = useState(undefined);
-  useEffect(() => { if (t.connected && !isCrypto(sym) && !sym.startsWith('.')) findInstrument(sym).then(setInst).catch(() => setInst(null)); else setInst(null); }, [sym, t.connected, t.env]);
+  const [fg, setFg] = useState(null);
+  useEffect(() => { if (t.connected && !isCrypto(sym) && !sym.startsWith('.') && !sym.startsWith('@') && !/=$/.test(sym)) findInstrument(sym).then(setInst).catch(() => setInst(null)); else setInst(null); }, [sym, t.connected, t.env]);
+  useEffect(() => { if (isCrypto(sym)) fearGreed().then((d) => setFg(d[0])).catch(() => {}); }, [sym]);
   const pos = inst && p.pos ? p.pos.find((x) => x.instrument.ticker === inst.ticker) : null;
   const inList = s.markets.list.some((x) => x.sym === sym);
-  const al = s.markets.alerts[sym];
-  const pts = useMemo(() => { const x = ch.pts ? [...ch.pts] : null; if (x && x.length && q && range === '1D' && (q.open || q.h24)) x.push([Date.now(), q.last]); return x; }, [ch.pts, q && q.last]);
-  const chg = pts && pts.length > 1 ? ((pts.at(-1)[1] - pts[0][1]) / pts[0][1]) * 100 : null;
+  const als = (s.alerts || []).filter((x) => x.sym === sym);
+  const stale = q && q.at && Date.now() - q.at > 3 * 60e3;
+  const unwatch = () => { removeWatch(sym); toast('Removed from watchlist'); };
   return html`<div class="screen">
-    <${Back} title=${nameOf(sym)} hint=${`${cleanSym(sym)}${q && q.name && !isCrypto(sym) ? ' · ' + q.name : ''}`} onBack=${() => history.back()}
-      right=${html`<button class=${`iconbtn ${al ? 'on' : ''}`} onClick=${() => setSheet('alert')} aria-label="Alert"><${Icon} n="bell" /></button>`} />
-    <div class="card hero">
-      <div class="label"><span class=${`livedot ${q && (q.open || q.h24) ? '' : 'off'}`}></span>${statusTxt(q)}</div>
-      <div class="ticker" style="font-size:40px">${q ? fmtPrice(q.last, sym) : '…'}</div>
-      ${q && html`<div class=${`mono ${q.pct >= 0 ? 'up' : 'down'}`} style="font-weight:600">${q.chg >= 0 ? '+' : '−'}${fmtPrice(Math.abs(q.chg), sym, q.last >= 1 ? 2 : null)} (${pctTxt(q.pct)}) <span class="hint">${q.h24 ? '24h' : 'today'}</span></div>`}
-      ${q && q.ext && q.status !== 'REG_MKT' && html`<div class="hint" style="margin-top:4px">${q.ext.type === 'PRE_MKT' ? 'Pre-market' : 'After hours'}: <b class="mono">${fmtPrice(q.ext.last, sym)}</b> <span class=${q.ext.pct >= 0 ? 'up' : 'down'}>${pctTxt(q.ext.pct)}</span></div>`}
+    <${Back} title=${html`${nameOf(sym)} <span class="mute" style="font-weight:400">${cleanSym(sym)}</span>`} hint=${`${isCrypto(sym) ? 'Coinbase' : 'CNBC'} · ${statusTxt(q).toLowerCase() || 'loading'}`} onBack=${() => history.back()}
+      right=${html`<button class=${`iconbtn ${als.some((x) => x.on) ? 'on' : ''}`} onClick=${() => go('alerts/' + encodeURIComponent(sym))} aria-label="Alerts"><${Icon} n="bell" size=${18} /></button>`} />
+    <div class="row" style="gap:10px;align-items:baseline;margin:-6px 2px 12px;flex-wrap:wrap">
+      <span class="ticker">${q ? fmtPrice(q.last, sym) : '…'}</span>
+      ${q && q.pct != null && html`<span class=${`delta ${q.pct >= 0 ? '' : 'down'}`}>${pctTxt(q.pct)} ${q.h24 ? '24h' : 'today'}</span>`}
+      ${stale && html`<span class="tag watch">price ${Math.round((Date.now() - q.at) / 60000)} min old</span>`}
     </div>
+    ${q && q.ext && q.status !== 'REG_MKT' && html`<div class="hint" style="margin:-6px 2px 10px">${q.ext.type === 'PRE_MKT' ? 'Pre-market' : 'After hours'}: <b class="mono">${fmtPrice(q.ext.last, sym)}</b> <span class=${q.ext.pct >= 0 ? 'up' : 'down'}>${pctTxt(q.ext.pct)}</span></div>`}
 
-    ${inst && html`<div class="btns" style="margin-bottom:12px">
-      <button class="btn primary grow" onClick=${() => setSheet({ trade: 'BUY' })}>Buy</button>
-      <button class="btn grow" disabled=${!pos} onClick=${() => setSheet({ trade: 'SELL' })}>Sell</button>
-    </div>`}
-    ${t.connected && inst === null && !isCrypto(sym) && !sym.startsWith('.') && html`<div class="note" style="margin:0 4px 12px">Trading 212 doesn't offer this listing through its API.</div>`}
+    <${ChartCard} sym=${sym} livePrice=${q && q.last} alerts=${als} onAlertMove=${(id, field, price) => { updateAlert(id, { [field]: price, firedAt: null }); toast('Alert moved to ' + fmtPrice(price, sym), 'bell'); }} />
+    ${isCrypto(sym) && html`<div class="card"><div class="row between" style="margin-bottom:8px"><span class="label">Market depth</span><span class="hint">±2% of price</span></div><${Depth} sym=${sym} /></div>
+      <div class="stat3" style="margin-bottom:12px"><div><div class="l">24h high</div><div class="v">${q ? fmtPrice(q.hi, sym) : '–'}</div></div><div><div class="l">24h low</div><div class="v">${q ? fmtPrice(q.lo, sym) : '–'}</div></div><div><div class="l">Fear / Greed</div><div class=${`v ${fg ? (fg.v >= 55 ? 'gold' : fg.v <= 45 ? 'down' : '') : ''}`}>${fg ? `${fg.v} ${fg.label.split(' ').pop()}` : '–'}</div></div></div>`}
 
-    <div class="card">
-      <${Seg} options=${RANGES.map(([k]) => [k, k])} value=${range} onChange=${setRange} />
-      <div style="margin-top:10px">${pts && pts.length > 1 ? html`<${LineChart} pts=${pts} time=${range === '1D' || range === '1W'} color=${chg >= 0 ? '#188152' : '#c23a30'} fmt=${(v) => fmtPrice(v, sym)} />` : html`<div class="empty" style="height:180px;display:grid;place-items:center">${ch.err ? 'Chart unavailable offline' : 'Loading…'}</div>`}</div>
-      ${chg != null && html`<div class="hint">${range}: <b class=${chg >= 0 ? 'up' : 'down'}>${pctTxt(chg)}</b></div>`}
-    </div>
+    <${SignalPanel} sym=${sym} an=${an} canTrade=${!!inst} onTrade=${(side) => setSheet({ trade: side })} onAlert=${() => setSheet('alert')} />
+
+    ${als.length > 0 && html`<div class="sect"><span class="h-title">Your alerts</span><button class="more" onClick=${() => go('alerts/' + encodeURIComponent(sym))}>Manage</button></div>
+      ${als.map((al) => html`<div class="alrow"><span class="cdot" style=${{ background: KINDS[al.kind].color }}></span><div class="grow"><div class="t1">${describe(al)}</div><div class="t2">${al.on ? 'active' : 'off'}</div></div></div>`)}`}
+
+    ${t.connected && inst === null && !isCrypto(sym) && !sym.startsWith('.') && html`<div class="note" style="margin:0 4px 12px">Trading 212 doesn't offer this listing through its API. Watching only.</div>`}
 
     ${pos && html`<div class="card">
-      <b>Your position</b>
-      <div class="kv" style="margin-top:8px">
+      <span class="label">Your position</span>
+      <div class="kv" style="margin-top:10px">
         <span>Shares</span><span>${num(pos.quantity, 4)}</span>
         <span>Average price</span><span>${fmtPrice(pos.averagePricePaid, sym)}</span>
         <span>Value</span><span>${money(pos.walletImpact.currentValue, pos.walletImpact.currency)}</span>
@@ -176,35 +181,25 @@ export function Asset({ sym }) {
       </div>
     </div>`}
 
-    ${sig && html`<div class=${`signal ${sig.level}`} style="margin-bottom:12px">
-      <b style="font-size:16px">${sig.label}</b>
-      <div class="hint">Based on the past year of prices</div>
-      <div class="range52"><span class="hint">1-yr low ${fmtPrice(q && q.lo52 ? Math.min(q.lo52, sig.lo) : sig.lo, sym)}</span><div class="bar52"><i style=${{ left: `${Math.max(2, Math.min(98, sig.pos))}%` }}></i></div><span class="hint">high ${fmtPrice(q && q.hi52 ? Math.max(q.hi52, sig.hi) : sig.hi, sym)}</span></div>
-      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${sig.reasons.map((r) => html`<div style="font-size:13.5px"><span class=${r.good ? 'up' : r.good === false ? 'down' : 'gold'}>${r.good ? '●' : r.good === false ? '●' : '●'}</span> ${r.text}</div>`)}
-        <div style="font-size:13.5px"><span class="cyan">●</span> Swings about ${sig.vol.toFixed(0)}% a year (${isCrypto(sym) ? (sig.vol > 90 ? 'very risky, even for crypto' : sig.vol > 45 ? 'normal for crypto' : 'calm for crypto') : sig.vol > 60 ? 'very risky' : sig.vol > 35 ? 'risky' : sig.vol > 20 ? 'normal for a stock' : 'calm'})</div></div>
-      <div class="note" style="margin-top:8px">A guide from price history only. ${isCrypto(sym) ? 'News and big holders selling can change things fast.' : 'Company news and earnings can change things fast.'}</div>
-    </div>`}
-
-    ${q && !isCrypto(sym) && (q.mcap || q.pe) && html`<div class="card"><b>Key numbers</b><div class="kv" style="margin-top:8px">
+    ${q && !isCrypto(sym) && (q.mcap || q.pe || q.hi52) && html`<div class="card"><span class="label">Key numbers</span><div class="kv" style="margin-top:10px">
       ${q.mcap && html`<span>Company value</span><span>$${q.mcap}</span>`}
       ${q.pe && html`<span>P/E (price ÷ yearly profit)</span><span>${num(q.pe, 1)}</span>`}
       ${q.eps && html`<span>Profit per share (yearly)</span><span>$${num(q.eps, 2)}</span>`}
       ${q.divYield && html`<span>Dividend yield</span><span>${q.divYield}</span>`}
-      ${q.hi52 && html`<span>1-year range</span><span>${fmtPrice(q.lo52, sym)} – ${fmtPrice(q.hi52, sym)}</span>`}
+      ${q.hi52 && html`<span>1-year range</span><span>${fmtPrice(q.lo52, sym)} to ${fmtPrice(q.hi52, sym)}</span>`}
       ${q.vol && html`<span>Volume today</span><span>${q.vol}</span>`}
     </div></div>`}
-    ${q && isCrypto(sym) && html`<div class="card"><b>Last 24 hours</b><div class="kv" style="margin-top:8px"><span>High</span><span>${fmtPrice(q.hi, sym)}</span><span>Low</span><span>${fmtPrice(q.lo, sym)}</span><span>Volume</span><span>${num(q.vol, 0)} ${cleanSym(sym)}</span></div></div>`}
 
     <div class="btns">
-      ${inList ? html`<button class="btn grow" onClick=${() => { removeWatch(sym); toast('Removed from watchlist'); }}>Remove from watchlist</button>` : html`<button class="btn primary grow" onClick=${() => { addWatch({ sym, name: nameOf(sym) }); toast('Added to watchlist'); }}>Add to watchlist</button>`}
-      <a class="btn grow" href=${`https://news.google.com/search?q=${encodeURIComponent((isCrypto(sym) ? nameOf(sym) + ' crypto' : nameOf(sym) + ' stock'))}&hl=en`} target="_blank" rel="noopener">Latest news</a>
+      ${inList ? html`<button class="btn" onClick=${unwatch}>Remove from watchlist</button>` : html`<button class="btn holo" onClick=${() => { addWatch({ sym, name: nameOf(sym) }); feedback('set'); toast('Added to watchlist'); }}>Add to watchlist</button>`}
+      <a class="btn" href=${`https://news.google.com/search?q=${encodeURIComponent((isCrypto(sym) ? nameOf(sym) + ' crypto' : nameOf(sym) + ' stock'))}&hl=en`} target="_blank" rel="noopener">Latest news</a>
     </div>
-    ${sheet === 'alert' && html`<${AlertSheet} sym=${sym} price=${q && q.last} onClose=${() => setSheet(null)} />`}
-    ${sheet && sheet.trade && html`<${TradeSheet} sym=${sym} side=${sheet.trade} inst=${inst} q=${q} pos=${pos} onClose=${() => setSheet(null)} />`}
+    ${sheet === 'alert' && html`<${AlertSheet} sym=${sym} onClose=${() => setSheet(null)} />`}
+    ${sheet && sheet.trade && html`<${TradeSheet} sym=${sym} side=${sheet.trade} inst=${inst} q=${q} pos=${pos} an=${an.res} onClose=${() => setSheet(null)} />`}
   </div>`;
 }
 
-function AlertSheet({ sym, price, onClose }) {
+function OldAlertSheet({ sym, price, onClose }) {
   const s = useStore();
   const cur = s.markets.alerts[sym] || {};
   const [above, setAbove] = useState(cur.above ? String(cur.above) : '');

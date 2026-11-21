@@ -25,15 +25,18 @@
   };
   const icon = (n) => `<svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 
+  ICONS.spark = '<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/>';
+  ICONS.globe = '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>';
+  ICONS.bell = '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>';
+  ICONS.grid = '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>';
   const NAV = [
-    [null, [['home', 'Home', 'home'], ['activity', 'Activity', 'receipt']]],
-    ['Invest', [['gold', 'Gold', 'coin'], ['news', 'Gold news', 'news'], ['markets', 'Markets', 'up'], ['portfolio', 'Portfolio', 'layers']]],
-    ['Money', [['wealth', 'Wealth', 'chart'], ['accounts', 'Accounts', 'bank'], ['card', 'Credit card', 'card'], ['friends', 'Friends', 'users'], ['goals', 'Goals', 'target']]],
-    ['Plan', [['budget', 'Budget', 'wallet'], ['bills', 'Bills', 'calendar'], ['history', 'History', 'clock']]],
-    ['More', [['zakat', 'Zakat', 'moon'], ['convert', 'Convert', 'swap'], ['backup', 'Backup', 'save'], ['settings', 'Settings', 'settings']]],
+    [null, [['home', 'Home', 'home'], ['advisor', 'Advisor', 'spark'], ['world', 'World', 'globe'], ['alerts', 'Alerts', 'bell']]],
+    ['Invest', [['markets', 'Markets', 'up'], ['portfolio', 'Portfolio', 'layers'], ['gold', 'Gold', 'coin'], ['news', 'News', 'news']]],
+    ['Money', [['wealth', 'Wealth', 'chart'], ['networth', 'Net worth', 'bank'], ['budget', 'Budget', 'wallet'], ['activity', 'Activity', 'receipt'], ['card', 'Credit card', 'card'], ['bills', 'Bills', 'calendar']]],
+    ['More', [['more', 'All tools', 'grid'], ['backup', 'Backup', 'save'], ['settings', 'Settings', 'settings']]],
   ];
   // sub-pages that should keep their parent highlighted
-  const PARENT = { asset: 'markets', broker: 'markets', summary: 'history' };
+  const PARENT = { asset: 'markets', broker: 'markets', summary: 'budget', history: 'budget' };
 
   const current = () => {
     const n = (location.hash.replace(/^#\/?/, '') || 'home').split('/')[0];
@@ -73,7 +76,7 @@
       if (current() !== 'markets') location.hash = '#/markets';
       setTimeout(() => { const i = document.querySelector('.screen input'); if (i) i.focus(); }, 150);
     }
-    else if (/^[1-4]$/.test(e.key)) location.hash = '#/' + ['home', 'gold', 'markets', 'wealth'][+e.key - 1];
+    else if (/^[1-4]$/.test(e.key)) location.hash = '#/' + ['home', 'markets', 'wealth', 'more'][+e.key - 1];
   });
 
   // click outside a sheet closes it (desktop modal behaviour)

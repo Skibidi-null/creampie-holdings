@@ -41,14 +41,39 @@ const nf = {};
 const fmtr = (d) => (nf[d] ||= new Intl.NumberFormat('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d }));
 export const num = (v, d = 2) => fmtr(d).format(Number.isFinite(v) ? v : 0).replace(/ /g, ' ');
 export const SYM = { PLN: 'zł', EUR: '€', USD: '$', AED: 'AED', GBP: '£', INR: '₹' };
-export const money = (v, cur = 'PLN', d = 2) => {
+export const CURS = ['PLN', 'AED', 'USD', 'EUR', 'INR', 'GBP'];
+// Display currency: every money() call converts from its source currency into the
+// currency chosen for the current section (app-wide default, or a per-section override).
+// rates = zł per 1 unit (from the store). Set by the app shell on each render.
+export const DISP = { cur: 'PLN', rates: null, app: 'PLN', sec: {} };
+export function setDisplay(app, sec, rates) { DISP.app = app || 'PLN'; DISP.sec = sec || {}; DISP.rates = rates; DISP.cur = DISP.app; }
+// call at the top of a screen's render to pick that section's currency
+export function section(name) { DISP.cur = (name && DISP.sec[name]) || DISP.app; return DISP.cur; }
+export function convert(v, from = 'PLN', to = DISP.cur) {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (!from || from === to) return v;
+  const r = DISP.rates || {};
+  const pln = from === 'PLN' ? v : r[from] ? v * r[from] : null;
+  if (pln == null) return null;
+  return to === 'PLN' ? pln : r[to] ? pln / r[to] : null;
+}
+export const fmtCur = (v, cur = 'PLN', d = 2) => {
   const s = num(Math.abs(v), d);
-  const sign = v < 0 ? '−' : '';
+  const sign = v < 0 ? '\u2212' : '';
   if (cur === 'PLN') return `${sign}${s} zł`;
   if (cur === 'AED') return `${sign}${s} AED`;
-  return `${sign}${SYM[cur] || cur}${s}`;
+  return `${sign}${SYM[cur] || cur + ' '}${s}`;
 };
-export const pct = (v, d = 1) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${num(Math.abs(v), d)}%`;
+// converts into the display currency (falls back to the source currency if no rate yet)
+export const money = (v, cur = 'PLN', d = 2) => {
+  const c = convert(v, cur);
+  return c == null ? fmtCur(v, cur, d) : fmtCur(c, DISP.cur, d);
+};
+// format in a given section's currency without changing the current one
+export const moneyIn = (sec, v, cur = 'PLN', d = 2) => { const keep = DISP.cur; DISP.cur = (sec && DISP.sec[sec]) || DISP.app; try { return money(v, cur, d); } finally { DISP.cur = keep; } };
+// no conversion (amounts that must stay in their own currency, e.g. order sizes)
+export const rawMoney = fmtCur;
+export const pct = (v, d = 1) => `${v > 0 ? '+' : v < 0 ? '\u2212' : ''}${num(Math.abs(v), d)}%`;
 
 export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 export const sum = (a, f = (x) => x) => a.reduce((s, x) => s + f(x), 0);

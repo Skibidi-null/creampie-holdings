@@ -39,7 +39,7 @@ export const DEFAULT_INC = [
 export const ACCOUNT_KINDS = { bank: 'Bank', savings: 'Savings', cash: 'Cash' };
 
 const blank = () => ({
-  v: 1,
+  v: 2,
   created: today(),
   accounts: [
     { id: 'main', name: 'Main bank', cur: 'PLN', kind: 'bank', opening: 0, icon: '🏦' },
@@ -55,9 +55,27 @@ const blank = () => ({
   goals: [],
   cats: { exp: DEFAULT_EXP, inc: DEFAULT_INC },
   zakat: { nisab: 'gold', countOwed: true, hawl: '', other: 0, debts: 0 },
-  settings: { privacy: false, pin: null, remind9pm: true, cardRemind: true, onboarded: false, alertsSetup: false },
+  settings: {
+    privacy: false, pin: null, remind9pm: true, cardRemind: true, onboarded: false, alertsSetup: false,
+    // v2
+    cur: 'PLN', curSec: {}, mute: false, vibrate: true, risk: 'balanced', riskPct: 1, tax: 'PL',
+    quiet: { on: true, from: 23, to: 7 }, autoLock: 60, sunday: true, fxFee: 0.15,
+    cooling: { on: true, pct: 10, mins: 10 }, backupRemind: true, lastBackup: 0,
+  },
   rates: { PLN: 1, USD: 0, EUR: 0, AED: 0, GBP: 0, INR: 0, at: 0 },
-  markets: { list: [{ sym: 'NVDA', name: 'NVIDIA' }, { sym: 'AAPL', name: 'Apple' }, { sym: 'MSFT', name: 'Microsoft' }, { sym: 'BTC-USD', name: 'Bitcoin' }, { sym: 'ETH-USD', name: 'Ethereum' }], alerts: {}, alertsOn: true },
+  markets: { list: [{ sym: '@GC.1', name: 'Gold' }, { sym: 'BTC-USD', name: 'Bitcoin' }, { sym: 'VUAA-GB', name: 'S&P 500 ETF (VUAA)' }, { sym: 'EURPLN=', name: 'EUR/PLN' }], alerts: {}, alertsOn: true },
+  // v2: price/signal alerts, several per asset. { id, sym, name, kind, a, b, pct, days, once, on, sound, vib, urgent, made, fired }
+  alerts: [],
+  // v2: guard + practice trading + journal + advisor call log + holdings at other brokers + net worth history
+  guard: { on: false, dailyLoss: 0, lockedDay: null },
+  paper: { cash: 100000, cur: 'USD', start: 100000, pos: [], trades: [] },
+  journal: [],
+  calls: [],
+  holdings: [],
+  nwHist: [],
+  dca: { on: false, amount: 0, day: 10, plan: [] },
+  freedom: { spend: 0, rate: 4, ret: 6, monthly: 0 },
+  chart: {},
 });
 
 function load() {
@@ -74,8 +92,22 @@ function load() {
 export function migrate(d) {
   const b = blank();
   const out = { ...b, ...d };
-  for (const k of ['card', 'gold', 'budget', 'zakat', 'settings', 'rates', 'cats', 'markets']) out[k] = { ...b[k], ...(d[k] || {}) };
-  for (const k of ['accounts', 'txns', 'friends', 'recurring', 'goals']) if (!Array.isArray(out[k])) out[k] = [];
+  for (const k of ['card', 'gold', 'budget', 'zakat', 'settings', 'rates', 'cats', 'markets', 'guard', 'paper', 'dca', 'freedom', 'chart']) out[k] = { ...b[k], ...(d[k] || {}) };
+  for (const k of ['accounts', 'txns', 'friends', 'recurring', 'goals', 'alerts', 'journal', 'calls', 'holdings', 'nwHist']) if (!Array.isArray(out[k])) out[k] = [];
+  out.settings.quiet = { ...b.settings.quiet, ...(out.settings.quiet || {}) };
+  out.settings.cooling = { ...b.settings.cooling, ...(out.settings.cooling || {}) };
+  if (!out.settings.curSec || typeof out.settings.curSec !== 'object') out.settings.curSec = {};
+  if (!Array.isArray(out.paper.pos)) out.paper.pos = [];
+  if (!Array.isArray(out.paper.trades)) out.paper.trades = [];
+  // v1 -> v2: old one-per-asset alerts {sym: {above, below}} become separate alerts (old object kept as is)
+  if (d.v !== 2 && out.markets.alerts && !out.alerts.length) {
+    const nm = (sym) => ((out.markets.list || []).find((x) => x.sym === sym) || {}).name || sym;
+    for (const [sym, a] of Object.entries(out.markets.alerts)) {
+      if (a && a.above) out.alerts.push({ id: uid(), sym, name: nm(sym), kind: 'above', a: a.above, once: false, on: true, sound: true, vib: true, made: 0 });
+      if (a && a.below) out.alerts.push({ id: uid(), sym, name: nm(sym), kind: 'below', a: a.below, once: false, on: true, sound: true, vib: true, made: 0 });
+    }
+  }
+  out.v = 2;
   if (!Array.isArray(out.gold.buys)) out.gold.buys = [];
   if (!Array.isArray(out.markets.list)) out.markets.list = [];
   if (!out.markets.alerts || typeof out.markets.alerts !== 'object') out.markets.alerts = {};

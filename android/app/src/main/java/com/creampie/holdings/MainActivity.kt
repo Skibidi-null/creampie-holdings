@@ -48,9 +48,9 @@ class MainActivity : FragmentActivity() {
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = false
         }
-        val root = FrameLayout(this).apply { setBackgroundColor(0xFFF5F4F0.toInt()) }
+        val root = FrameLayout(this).apply { setBackgroundColor(0xFF040407.toInt()) }
         web = WebView(this).apply {
-            setBackgroundColor(0xFFF5F4F0.toInt())
+            setBackgroundColor(0xFF040407.toInt())
             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             overScrollMode = WebView.OVER_SCROLL_NEVER
             isVerticalScrollBarEnabled = false
@@ -163,7 +163,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showOffline() {
-        val html = """<html><body style="background:#f4f4f1;color:#1d1d1b;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px">
+        val html = """<html><body style="background:#040407;color:#F4F5FA;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px">
             <div style="font-size:54px">🔌</div><h2 style="color:#ff7ab8">No connection</h2>
             <p style="color:#b49bb5">Creampie needs the internet the very first time it opens. After that it works offline.</p>
             <button onclick="location.href='$SITE#/home'" style="margin-top:12px;background:#1f6b57;color:#fff;border:0;border-radius:14px;padding:14px 26px;font-size:16px">Try again</button></body></html>"""

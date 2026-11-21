@@ -2,7 +2,8 @@ import { h } from 'preact';
 import htm from 'htm';
 import { useState, useRef, useMemo, useEffect } from 'preact/hooks';
 import { get } from './store.js';
-import { money, num, clamp, parseNum } from './util.js';
+import { money, moneyIn, num, clamp, parseNum } from './util.js';
+import { Icon } from './icons.js';
 
 export const html = htm.bind(h);
 
@@ -17,19 +18,20 @@ export function Toaster() {
     toastSubs.add(f); return () => toastSubs.delete(f);
   }, []);
   if (!t) return null;
-  return html`<div class="toast" key=${t.id} onClick=${() => setT(null)}><span style="font-size:20px">${t.icon}</span><span>${t.text}</span></div>`;
+  const bad = t.icon === '!' || t.icon === '✕';
+  return html`<div class="toast" key=${t.id} onClick=${() => setT(null)} role="status"><span class=${`ti ${bad ? 'bad' : ''}`}><${Icon} n=${bad ? 'alert' : t.icon === 'bell' ? 'bell' : 'check'} size=${15} sw=${2} /></span><span>${t.text}</span></div>`;
 }
 
 // ---------- money with discreet mode ----------
-export function Money({ v, cur = 'PLN', cls = '', sign = false, d = 2 }) {
+export function Money({ v, cur = 'PLN', cls = '', sign = false, d = 2, sec }) {
   const priv = get().settings.privacy;
-  const txt = (sign && v > 0 ? '+' : '') + money(v, cur, d);
+  const txt = (sign && v > 0 ? '+' : '') + (sec ? moneyIn(sec, v, cur, d) : money(v, cur, d));
   return html`<span class=${`mono ${cls} ${priv ? 'blur' : ''}`}>${priv ? '••••' : txt}</span>`;
 }
 
 export function Back({ title, hint, onBack, right }) {
   return html`<div class="back">
-    <button class="iconbtn" onClick=${onBack} aria-label="Back">←</button>
+    <button class="iconbtn" onClick=${onBack} aria-label="Back"><${Icon} n="back" size=${18} /></button>
     <div class="t"><div class="h-title">${title}</div>${hint && html`<div class="hint">${hint}</div>`}</div>
     ${right}
   </div>`;
@@ -100,7 +102,7 @@ export function Sheet({ title, onClose, children }) {
     <div class="sheet" ref=${ref}>
       <div class="sheet-top" ref=${topRef}>
         <div class="grab"></div>
-        <div class="sheet-head">${title ? html`<h3>${title}</h3>` : ''}<button class="x" onClick=${close} aria-label="Close">✕</button></div>
+        <div class="sheet-head">${title ? html`<h3>${title}</h3>` : ''}<button class="x" onClick=${close} aria-label="Close"><${Icon} n="x" size=${15} /></button></div>
       </div>
       ${typeof children === 'function' ? children(close) : children}
     </div>

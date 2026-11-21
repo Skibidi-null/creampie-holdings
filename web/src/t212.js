@@ -13,6 +13,9 @@ const subs = new Set();
 const emit = () => subs.forEach((f) => f({}));
 const save = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch {} emit(); };
 
+// shared portfolio cache (filled by the markets screens, read by net worth and widgets)
+export const T212C = { sum: null, pos: null, ord: null, at: 0, err: null };
+
 export const T212 = {
   get env() { return cfg.env || 'demo'; },
   get connected() { const c = cfg[this.env]; return !!(c && c.key && c.secret && c.ok); },

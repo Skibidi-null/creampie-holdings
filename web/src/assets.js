@@ -4,16 +4,20 @@
 import { useEffect, useState } from 'preact/hooks';
 import { get, set } from './store.js';
 import { parseQuotes, QUOTE_URL } from './signals.js';
+import { mark } from './data.js';
 
 const CB = 'https://api.exchange.coinbase.com';
 export const isCrypto = (sym) => /^[A-Z0-9]+-USD$/.test(sym) && !sym.includes('.');
-export const cleanSym = (sym) => (isCrypto(sym) ? sym.replace('-USD', '') : sym.replace(/^\./, ''));
+const NICE = { '@GC.1': 'GOLD', '@SI.1': 'SILVER', '@CL.1': 'OIL', 'PLN=': 'USD/PLN', 'EUR=': 'EUR/USD', 'AED=': 'USD/AED', 'INR=': 'USD/INR', 'JPY=': 'USD/JPY' };
+export const cleanSym = (sym) => NICE[sym] || (isCrypto(sym) ? sym.replace('-USD', '') : /^[A-Z]{6}=$/.test(sym) ? sym.slice(0, 3) + '/' + sym.slice(3, 6) : sym.replace(/^[.@]/, '').replace(/\.1$/, '').replace(/-[A-Z]{2}$/, ''));
 
 export const DEFAULT_WATCH = [
   { sym: 'NVDA', name: 'NVIDIA' }, { sym: 'AAPL', name: 'Apple' }, { sym: 'MSFT', name: 'Microsoft' },
   { sym: 'BTC-USD', name: 'Bitcoin' }, { sym: 'ETH-USD', name: 'Ethereum' },
 ];
 export const INDICES = [['.SPX', 'S&P 500'], ['.IXIC', 'Nasdaq'], ['.VIX', 'Fear (VIX)'], ['BTC-USD', 'Bitcoin']];
+// always refreshed: home tickers, risk meter, currency board
+export const ALWAYS = ['.SPX', '.IXIC', '.DJI', '.VIX', 'HYG', '@GC.1', '.DXY', 'BTC-USD', 'EURPLN=', 'PLN=', 'US10Y'];
 
 // ---------- live quotes ----------
 const LS = 'cp.assets.v1';
@@ -29,7 +33,7 @@ async function j(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok
 
 export const watchSyms = () => {
   const m = get().markets || {};
-  return [...new Set([...(m.list || []).map((x) => x.sym), ...INDICES.map((x) => x[0]), ...(m.extra || [])])];
+  return [...new Set([...(m.list || []).map((x) => x.sym), ...INDICES.map((x) => x[0]), ...ALWAYS, ...(get().holdings || []).map((h) => h.sym), ...(m.extra || [])])];
 };
 
 async function stockQuotes(syms) {
@@ -54,9 +58,13 @@ export async function refreshAssets(extra = []) {
   const all = [...new Set([...watchSyms(), ...extra])];
   try {
     const [a, b] = await Promise.all([stockQuotes(all.filter((s) => !isCrypto(s))), cryptoQuotes(all.filter(isCrypto))]);
+    for (const k of Object.keys(a)) a[k].at = Date.now();
+    for (const k of Object.keys(b)) b[k].at = Date.now();
     A.q = { ...A.q, ...a, ...b }; A.at = Date.now(); A.err = null;
-    checkAlerts();
-  } catch { A.err = 'offline'; }
+    if (Object.keys(a).length) mark('cnbc', true);
+    if (Object.keys(b).length) mark('coinbase', true);
+    tickBus.forEach((f) => { try { f(A.q); } catch (e) { console.warn(e); } });
+  } catch (e) { A.err = 'offline'; mark('cnbc', false, e && e.message); }
   persist(); emit();
 }
 
@@ -188,7 +196,8 @@ export function assetSignal(daily, price, crypto = false) {
   return { level, label: { good: 'Looks like a fair entry', ok: 'Neutral', wait: 'Stretched: maybe wait' }[level], reasons, rsi: r, m50, m200, hi, lo, pos, fromHi, vol };
 }
 
-// ---------- price alerts (in-app; background checks run on Android worker / GitHub job) ----------
+export const tickBus = new Set();
+// ---------- (v1) price alerts: replaced by alerts.js; kept for reference ----------
 const firedA = (() => { try { return JSON.parse(sessionStorage.getItem('cp.afired')) || {}; } catch { return {}; } })();
 export const assetAlertBus = new Set();
 function checkAlerts() {
@@ -207,7 +216,7 @@ export function setAlert(sym, a) {
   set((s) => { const al = { ...(s.markets.alerts || {}) }; if (!a || (!a.above && !a.below)) delete al[sym]; else al[sym] = a; return { ...s, markets: { ...s.markets, alerts: al } }; });
 }
 
-export const curSign = (sym) => { const q = A.q[sym]; const c = isCrypto(sym) ? 'USD' : (q && q.cur) || 'USD'; return c === 'USD' ? '$' : c === 'EUR' ? '€' : c === 'GBP' ? '£' : c === 'PLN' ? 'zł ' : ''; };
+export const curSign = (sym) => { if (/=$/.test(sym) || /^US\d+Y/.test(sym)) return ''; const q = A.q[sym]; const c = isCrypto(sym) ? 'USD' : (q && q.cur) || 'USD'; return c === 'USD' ? '$' : c === 'EUR' ? '€' : c === 'GBP' ? '£' : c === 'PLN' ? 'zł ' : ''; };
 export const fmtPrice = (v, sym, dec = null) => {
   if (v == null || !Number.isFinite(v)) return '—';
   const idx = sym && sym.startsWith('.');

@@ -4,21 +4,26 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
 <title>Creampie Holdings</title>
-<meta name="description" content="Personal money tracker" />
-<meta name="theme-color" content="#f5f4f0" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#0f1011" media="(prefers-color-scheme: dark)" />
+<meta name="description" content="Personal investing, markets and money" />
+<meta name="theme-color" content="#040407" />
+<meta name="color-scheme" content="dark" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Creampie" />
 <link rel="apple-touch-icon" href="icons/icon-180.png" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="manifest" href="manifest.webmanifest" />
+<link rel="preload" href="fonts/grotesk.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/mono.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="style.css?v=__VERSION__" />
+<style>html,body{background:#040407}#boot{position:fixed;inset:0;display:grid;place-items:center;background:#040407}#boot img{width:96px;height:96px;border-radius:24px;box-shadow:0 0 60px rgba(122,92,255,.45);animation:b 1.6s ease-in-out infinite}@keyframes b{50%{transform:scale(1.05);box-shadow:0 0 80px rgba(0,210,255,.5)}}</style>
 </head>
 <body>
-<div id="app"></div>
+<div class="bgfx"><i class="g1"></i><i class="g2"></i><i class="g3"></i><div class="grid"></div></div>
+<div id="app"><div id="boot"><img src="icons/icon-192.png" alt="" /></div></div>
 <script type="module" src="app.js?v=__VERSION__"></script>
+<script defer src="desktop.js?v=__VERSION__"></script>
 </body>
 </html>

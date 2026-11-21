@@ -7,7 +7,13 @@ import { startMarket, liveSignals, useMarket } from './market.js';
 import { Icon } from './icons.js';
 import { syncConfig, localNotify, isNative } from './push.js';
 import { T } from './copy.js';
-import { sha256, vibrate } from './util.js';
+import { sha256, vibrate, setDisplay, section } from './util.js';
+import { feedback, sound } from './fx.js';
+import { Hub } from './hub.js';
+import { AdvisorScreen } from './advisorScreen.js';
+import { World } from './world.js';
+import { AlertsScreen, startAlerts } from './alertsScreen.js';
+import { NetWorthScreen } from './wealthPlus.js';
 import { Home } from './home.js';
 import { Activity } from './activity.js';
 import { AddSheet } from './add.js';
@@ -19,7 +25,7 @@ import { Back } from './ui.js';
 import { Markets, Asset, Portfolio, Broker } from './marketsScreen.js';
 import { startAssets, assetAlertBus } from './assets.js';
 
-const TABS = ['home', 'gold', 'markets', 'wealth'];
+const TABS = ['home', 'markets', 'wealth', 'more'];
 const route = () => { const parts = (location.hash.replace(/^#\/?/, '') || 'home').split('/'); return { name: parts[0], arg: parts[1] }; };
 
 function useRoute() {
@@ -67,21 +73,34 @@ function Lock({ onOpen }) {
   </div>`;
 }
 
+const ORB = [
+  ['spark', 'Advisor', () => (location.hash = '#/advisor')],
+  ['receipt', 'Add expense', (o) => o('exp')],
+  ['bell', 'New alert', () => (location.hash = '#/alerts/new')],
+  ['trade', 'Trade', () => (location.hash = '#/markets')],
+  ['up', 'Add income', (o) => o('inc')],
+  ['flask', 'Practice', () => (location.hash = '#/practice')],
+];
 function Dock({ tab, onAdd }) {
-  const go = (t) => { vibrate(6); if (route().name !== t) location.replace('#/' + t); };
-  const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i"><${Icon} n=${i} size=${22} sw=${tab === t ? 2.1 : 1.7} /></span>${label}</button>`;
-  return html`<nav class="dock">
-    ${B('home', 'home', T.nHome)}
-    ${B('gold', 'coin', T.nGold)}
-    <button class="plus" onClick=${onAdd} aria-label="Add"><${Icon} n="plus" size=${26} sw=${2.2} /></button>
-    ${B('markets', 'up', 'Markets')}
-    ${B('wealth', 'chart', T.nWealth)}
+  const [open, setOpen] = useState(false);
+  const [rip, setRip] = useState(0);
+  const go = (t) => { vibrate(6); setOpen(false); if (route().name !== t) location.replace('#/' + t); };
+  const B = (t, i, label) => html`<button class=${tab === t ? 'on' : ''} onClick=${() => go(t)}><span class="i"><${Icon} n=${i} size=${21} sw=${tab === t ? 1.9 : 1.6} /></span>${label}</button>`;
+  return html`${open && html`<div class="orbmenu" onClick=${() => setOpen(false)}><div class="items">${ORB.map(([ic, nm, f]) => html`<button onClick=${(e) => { e.stopPropagation(); setOpen(false); feedback('tap'); f(onAdd); }}><span class="ic"><${Icon} n=${ic} size=${22} /></span>${nm}</button>`)}</div></div>`}
+  <nav class="dock">
+    ${B('home', 'home', 'Home')}
+    ${B('markets', 'bars', 'Markets')}
+    <button class=${`orb ${open ? 'open' : ''}`} onClick=${() => { setRip((x) => x + 1); feedback('open'); setOpen(!open); }} aria-label="Actions"><span class="ring"></span><span class="core"><${Icon} n=${open ? 'plus' : 'spark'} size=${21} sw=${1.8} /></span>${rip > 0 && html`<span class="rip" key=${rip}></span>`}</button>
+    ${B('wealth', 'pie', 'Wealth')}
+    ${B('more', 'dots', 'More')}
   </nav>`;
 }
 
 function App() {
   const s = useStore();
   const r = useRoute();
+  setDisplay(s.settings.cur, s.settings.curSec, s.rates);
+  section({ gold: 'gold', markets: 'markets', asset: 'markets', portfolio: 'markets', broker: 'markets', advisor: 'markets', wealth: 'wealth', networth: 'wealth', accounts: 'wealth', budget: 'budget', bills: 'budget', activity: 'budget', card: 'budget', summary: 'budget', history: 'budget' }[r.name]);
   const [locked, setLocked] = useState(!!s.settings.pin);
   const [sheet, setSheet] = useState(null);
   sheets.open = (opts) => setSheet(opts || {});
@@ -92,7 +111,8 @@ function App() {
     loadHistory().catch(() => {});
     startMarket(fetchNews);
     startAssets();
-    const onAsset = (text) => { toast(text, '!', 6000); localNotify('Price alert', text); };
+    startAlerts();
+    const onAsset = (text) => { toast(text, 'bell', 6000); localNotify('Price alert', text); };
     assetAlertBus.add(onAsset);
     syncConfig();
     const onAlert = (a) => { toast(a.text, '!', 6000); localNotify('Gold price alert', a.text); };
@@ -109,7 +129,7 @@ function App() {
       if (document.visibilityState === 'hidden') lastHidden = Date.now();
       else {
         applyRecurring(); syncConfig();
-        if (get().settings.pin && lastHidden && Date.now() - lastHidden > 60e3) setLocked(true);
+        if (get().settings.pin && lastHidden && Date.now() - lastHidden > (get().settings.autoLock || 60) * 1e3) setLocked(true);
       }
     };
     document.addEventListener('visibilitychange', vis);
@@ -130,6 +150,11 @@ function App() {
     wealth: () => html`<${Wealth} />`,
     news: () => html`<div class="screen"><${Back} title=${T.news} hint="Gold news & what it might mean" onBack=${() => history.back()} /><${NewsScreen} /></div>`,
     markets: () => html`<${Markets} />`,
+    more: () => html`<${Hub} />`,
+    advisor: () => html`<${AdvisorScreen} />`,
+    world: () => html`<${World} tab=${r.arg} />`,
+    alerts: () => html`<${AlertsScreen} arg=${r.arg} key=${r.arg} />`,
+    networth: () => html`<${NetWorthScreen} />`,
     asset: () => html`<${Asset} sym=${decodeURIComponent(r.arg || '')} key=${r.arg} />`,
     portfolio: () => html`<${Portfolio} />`,
     broker: () => html`<${Broker} />`,
