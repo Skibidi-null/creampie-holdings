@@ -4,5 +4,5 @@
     android:targetCellWidth="1" android:targetCellHeight="1"
     android:resizeMode="horizontal|vertical" android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/w_holo" android:previewLayout="@layout/w_holo"
-    android:description="@string/wd_ticker" android:configure="com.creampie.holdings.WidgetConfig" android:widgetFeatures="reconfigurable|configuration_optional"
+    android:description="@string/wd_ticker" android:configure="com.creampie.holdings.WidgetConfig" android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen" />

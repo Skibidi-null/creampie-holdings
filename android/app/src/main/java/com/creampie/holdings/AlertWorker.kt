@@ -231,7 +231,8 @@ class AlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
         try {
             val w = cfg.optJSONObject("widget"); val syms = LinkedHashSet<String>()
             w?.optJSONArray("watch")?.let { for (i in 0 until minOf(it.length(), 8)) syms += it.getJSONObject(i).optString("sym") }
-            for ((k, v) in prefs.all) if (k.startsWith("w_") && v is String) syms += v
+            for ((k, v) in prefs.all) if (k.startsWith("w_") && v is String) syms += v.split(",").filter { it.isNotBlank() }
+            ed.putLong("wUpdated", now)
             for (sym in syms) { val q = quoteFull(sym) ?: continue; ed.putString("q_$sym", JSONObject().put("last", q.first).put("pct", q.second ?: JSONObject.NULL).put("at", now).toString()) }
         } catch (_: Exception) {}
 

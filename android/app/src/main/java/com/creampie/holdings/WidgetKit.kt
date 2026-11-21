@@ -50,6 +50,20 @@ object WidgetKit {
     private const val MINT = 0xFF3CFFB4.toInt(); private const val PINK = 0xFFFF5C8A.toInt(); private const val GOLD = 0xFFFFE36E.toInt()
     private const val DIM = 0xFFA9ABC8.toInt(); private const val MUTE = 0xFF6E7190.toInt(); private const val WHITE = 0xFFF4F5FA.toInt()
 
+    /** the assets a Watchlist widget shows: chosen ones (in order) or the app's watchlist */
+    fun watchItems(ctx: Context, w: JSONObject?, id: Int): List<Pair<String, String>> {
+        val arr = w?.optJSONArray("watch") ?: JSONArray()
+        val names = HashMap<String, String>(EXTRA_NAMES); for (i in 0 until arr.length()) arr.getJSONObject(i).let { names[it.optString("sym")] = it.optString("name") }
+        val picks = (Store.prefs(ctx).getString("w_$id", null) ?: "").split(",").filter { it.isNotBlank() }
+        return if (picks.isNotEmpty()) picks.map { it to (names[it] ?: it) } else (0 until arr.length()).map { arr.getJSONObject(it).let { o -> o.optString("sym") to o.optString("name") } }
+    }
+    val EXTRA_NAMES = mapOf("@GC.1" to "Gold", "@SI.1" to "Silver", "BTC-USD" to "Bitcoin", "ETH-USD" to "Ethereum", "VUAA-GB" to "S&P 500 ETF (VUAA)", "CSPX-GB" to "S&P 500 ETF (CSPX)", ".SPX" to "S&P 500", ".IXIC" to "Nasdaq", "EURPLN=" to "EUR/PLN", "PLN=" to "USD/PLN", "@CL.1" to "Oil")
+    fun configIntent(ctx: Context, id: Int): PendingIntent = PendingIntent.getActivity(ctx, 9500 + id, Intent(ctx, WidgetConfig::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    private fun updatedCorner(ctx: Context, v: RemoteViews, id: Int) {
+        val at = Store.prefs(ctx).getLong("wUpdated", 0)
+        v.setTextViewText(R.id.corner, if (at == 0L) "tap to update" else "updated " + java.text.SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date(at)))
+        v.setOnClickPendingIntent(R.id.corner, PendingIntent.getBroadcast(ctx, 9700 + id, Intent(ctx, RefreshReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    }
     fun refreshAll(ctx: Context) {
         val mgr = AppWidgetManager.getInstance(ctx)
         for ((k, cls) in ALL) for (id in mgr.getAppWidgetIds(ComponentName(ctx, cls))) runCatching { render(ctx, mgr, id, k) }
@@ -82,22 +96,25 @@ object WidgetKit {
         val wide = wDp >= 220
         val dens = ctx.resources.displayMetrics.density
         val cfg = Store.config(ctx); val w = cfg.optJSONObject("widget"); val priv = w?.optBoolean("privacy", false) == true
+        pkg = ctx.packageName; resCtx = ctx
         val v = RemoteViews(ctx.packageName, R.layout.w_holo)
         for (x in listOf(R.id.gauge, R.id.chart, R.id.rows, R.id.foot, R.id.sub)) v.setViewVisibility(x, View.GONE)
         v.setViewVisibility(R.id.mid, View.VISIBLE); v.setViewVisibility(R.id.head, View.VISIBLE)
         v.setTextViewText(R.id.corner, ""); v.setTextColor(R.id.sub, MINT); v.setTextColor(R.id.big, WHITE)
-        val padH = ((if (cell) 6 else 13) * dens).toInt(); val padV = ((if (short) 6 else 12) * dens).toInt()
+        val scale = (min(wDp / 110f, hDp / 110f)).coerceIn(0.7f, 2.2f) // 1.0 = a 2x2 widget
+        val padH = ((if (cell) 6 else 10) * dens).toInt(); val padV = ((if (short) 5 else 8) * dens).toInt()
         v.setViewPadding(R.id.pad, padH, padV, padH, padV)
-        v.setTextViewTextSize(R.id.label, TypedValue.COMPLEX_UNIT_SP, if (short || cell) 8.5f else 9.5f)
-        v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, 10.5f)
-        val inner = wDp - (if (cell) 16 else 26)
+        v.setTextViewTextSize(R.id.label, TypedValue.COMPLEX_UNIT_SP, (8.5f * scale).coerceIn(8.5f, 12f))
+        v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, (10.5f * scale).coerceIn(10f, 16f))
+        v.setViewVisibility(R.id.edit, View.GONE)
+        val inner = wDp - (if (cell) 16 else 22)
         // big text sized to fit the width (no ellipsis)
         fun big(t: String, maxSp: Float, color: Int = WHITE) {
             val fit = (inner / (max(t.length, 3) * 0.64f)).coerceIn(9f, maxSp)
             v.setTextViewText(R.id.big, t); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, fit); v.setTextColor(R.id.big, color)
         }
         fun sub(t: String, color: Int = MINT) { if (t.isEmpty() || short && hDp < 80) return; v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, t); v.setTextColor(R.id.sub, color) }
-        val bigMax = if (short) 17f else if (wide && tall) 34f else 24f
+        val bigMax = (min(hDp * 0.30f, wDp * 0.2f)).coerceIn(14f, 52f)
         val chartPx = { ww: Int, hh: Int -> Pair(min((ww * dens).toInt(), 900), min((hh * dens).toInt(), 400)) }
         var route = "home"
         when (kind) {
@@ -110,53 +127,66 @@ object WidgetKit {
                 val sp = w?.optJSONArray("nwSpark")
                 if (!short && sp != null && sp.length() > 1) {
                     val vals = DoubleArray(sp.length()) { sp.optDouble(it) }
-                    val (cw, ch) = chartPx(inner, max(30, hDp - 90)); v.setImageViewBitmap(R.id.chart, spark(vals, cw, ch, true, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE)
+                    val (cw, ch) = chartPx(inner, max(30, (hDp * 0.45f).toInt())); v.setImageViewBitmap(R.id.chart, spark(vals, cw, ch, true, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE)
                 } else if (!short) sub("History builds up day by day", DIM)
                 if (wide) v.setTextViewText(R.id.corner, w?.optString("cur", "") ?: "")
             }
             "signal" -> {
                 val calls = w?.optJSONArray("calls") ?: JSONArray()
-                val pick = Store.prefs(ctx).getString("w_$id", null)
-                var c: JSONObject? = null
-                for (i in 0 until calls.length()) { val x = calls.getJSONObject(i); if (pick == null || x.optString("sym") == pick) { c = x; break } }
+                val picks = (Store.prefs(ctx).getString("w_$id", null) ?: "").split(",").filter { it.isNotBlank() }
+                val all = (0 until calls.length()).map { calls.getJSONObject(it) }
+                val chosen = (if (picks.isEmpty()) all.take(1) else picks.mapNotNull { p -> all.firstOrNull { it.optString("sym") == p } ?: JSONObject().put("sym", p).put("name", EXTRA_NAMES[p] ?: p) }).take(4)
+                val c = chosen.firstOrNull()
                 route = if (c != null) "asset/" + java.net.URLEncoder.encode(c.optString("sym"), "UTF-8") else "advisor"
-                val score = c?.optDouble("score", Double.NaN) ?: Double.NaN
-                val verdict = c?.optString("v") ?: ""
-                val vc = if (verdict.contains("Buy")) MINT else if (verdict.contains("Sell")) PINK else GOLD
-                if (cell) {
-                    // one column: name on top, the gauge (with the score) fills the rest
-                    v.setTextViewText(R.id.label, (c?.optString("name") ?: "SIGNAL").uppercase())
-                    val gs = max(36, min(wDp - 16, hDp - 30))
-                    v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
-                    v.setTextViewText(R.id.big, ""); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, 1f)
+                v.setViewVisibility(R.id.edit, if (cell) View.GONE else View.VISIBLE)
+                v.setOnClickPendingIntent(R.id.edit, configIntent(ctx, id))
+                if (chosen.size > 1 && !short && !cell) {
+                    // several signals: a grid of gauges filling the widget
+                    v.setTextViewText(R.id.label, "SIGNALS"); v.setViewVisibility(R.id.mid, View.GONE)
+                    val (cw, ch) = chartPx(inner, hDp - 30)
+                    v.setImageViewBitmap(R.id.chart, multiGauge(chosen, cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE)
+                    route = "advisor"
                 } else {
-                    v.setTextViewText(R.id.label, "SIGNAL")
-                    val gs = if (short) max(36, hDp - 26) else if (tall) 92 else 64
-                    v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
-                    val nm = c?.optString("name") ?: "Open app"
-                    val room = inner - gs - 10
-                    v.setTextViewText(R.id.big, nm); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, (room / (max(nm.length, 4) * 0.6f)).coerceIn(10f, 16f)); v.setTextColor(R.id.big, WHITE)
-                    if (verdict.isNotEmpty()) { v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, verdict.uppercase()); v.setTextColor(R.id.sub, vc) }
+                    val score = c?.optDouble("score", Double.NaN) ?: Double.NaN
+                    val verdict = c?.optString("v") ?: ""
+                    val vc = if (verdict.contains("Buy")) MINT else if (verdict.contains("Sell")) PINK else GOLD
+                    val nm = c?.optString("name") ?: "Tap EDIT to choose"
+                    if (cell) {
+                        v.setTextViewText(R.id.label, nice(c?.optString("sym") ?: "", nm).uppercase())
+                        val gs = max(36, min(wDp - 14, hDp - 28))
+                        v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
+                        v.setTextViewText(R.id.big, ""); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, 1f)
+                    } else {
+                        v.setTextViewText(R.id.label, "SIGNAL")
+                        val gs = max(40, min((wDp * 0.48f).toInt(), hDp - 34))
+                        v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
+                        val room = inner - gs - 10
+                        v.setTextViewText(R.id.big, nm); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, (room / (max(nm.length, 4) * 0.6f)).coerceIn(10f, 26f)); v.setTextColor(R.id.big, WHITE)
+                        if (verdict.isNotEmpty()) { v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, verdict.uppercase() + if (!score.isNaN() && !short) "  ${Math.round(score)}/100" else ""); v.setTextColor(R.id.sub, vc) }
+                        else if (!score.isNaN()) Unit else { v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, "No score yet: add it to your watchlist"); v.setTextColor(R.id.sub, DIM) }
+                    }
                 }
             }
             "watch" -> {
                 route = "markets"
                 v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
+                v.setViewVisibility(R.id.edit, if (cell) View.GONE else View.VISIBLE); v.setOnClickPendingIntent(R.id.edit, configIntent(ctx, id))
                 if (short) v.setViewVisibility(R.id.head, View.GONE) else v.setTextViewText(R.id.label, "WATCHLIST")
-                val arr = w?.optJSONArray("watch") ?: JSONArray()
-                val rowH = if (short) 17 else 22
-                val n = min(arr.length(), ((hDp - (if (short) 10 else 34)) / rowH).coerceIn(1, 6))
-                for (i in 0 until 6) {
+                val items = watchItems(ctx, w, id)
+                val avail = hDp - (if (short) 10 else 30)
+                val n = min(items.size, (avail / 18).coerceIn(1, 10))
+                val rowSp = ((avail.toFloat() / max(n, 1)) * 0.42f).coerceIn(10f, if (cell) 13f else 18f)
+                for (i in 0 until 10) {
                     val row = rid("row", i); if (i >= n) { v.setViewVisibility(row, View.GONE); continue }
-                    val x = arr.getJSONObject(i); val (last, pc) = quote(ctx, w, x.optString("sym"))
+                    val (sym, name) = items[i]; val (last, pc) = quote(ctx, w, sym)
                     v.setViewVisibility(row, View.VISIBLE)
-                    v.setViewPadding(row, 0, ((if (short) 1 else 3) * dens).toInt(), 0, ((if (short) 1 else 3) * dens).toInt())
-                    v.setTextViewText(rid("r", i, "n"), if (cell) nice(x.optString("sym"), x.optString("name")) else x.optString("name"))
-                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "-" else if (wide && last != null) "${price(last)}  ${pct(pc)}" else pct1(pc))
+                    v.setTextViewText(rid("r", i, "n"), if (cell) nice(sym, name) else name)
+                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "-" else if (wDp >= 200 && last != null) "${price(last)}  ${pct(pc)}" else pct1(pc))
                     v.setTextColor(rid("r", i, "v"), if ((pc ?: 0.0) >= 0) MINT else PINK)
-                    for (t in listOf(rid("r", i, "n"), rid("r", i, "v"))) v.setTextViewTextSize(t, TypedValue.COMPLEX_UNIT_SP, if (cell) 10f else if (short) 11f else 12f)
+                    for (t in listOf(rid("r", i, "n"), rid("r", i, "v"))) v.setTextViewTextSize(t, TypedValue.COMPLEX_UNIT_SP, rowSp)
                 }
-                if (arr.length() == 0) { v.setViewVisibility(R.id.row0, View.VISIBLE); v.setTextViewText(R.id.r0n, "Open the app to load your list"); v.setTextViewText(R.id.r0v, "") }
+                if (items.isEmpty()) { v.setViewVisibility(R.id.row0, View.VISIBLE); v.setTextViewText(R.id.r0n, "Tap EDIT to choose assets"); v.setTextViewText(R.id.r0v, "") }
+                if (!short && wDp >= 200) updatedCorner(ctx, v, id)
             }
             "risk" -> {
                 route = "world"
@@ -164,7 +194,7 @@ object WidgetKit {
                 v.setTextViewText(R.id.label, if (wide) "RISK ON / OFF" else "RISK")
                 val sc = r?.optInt("score", -1) ?: -1
                 big(if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIXED", if (cell) 22f else bigMax, if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD)
-                if (sc < 0) sub("Open the app once", DIM) else if (!cell) sub("${r?.optString("label")} · $sc/100", DIM) else sub("$sc/100", DIM)
+                if (sc < 0) sub("Open the app once", DIM) else if (!cell && (short || hDp >= 160)) sub("${r?.optString("label")} · $sc/100", DIM) else if (cell) sub("$sc/100", DIM)
                 if (!short && sc >= 0) { val (cw, ch) = chartPx(inner, 16); v.setImageViewBitmap(R.id.chart, meter(sc / 100.0, cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
             }
             "ticker" -> {
@@ -229,16 +259,18 @@ object WidgetKit {
                     val pc = quote(ctx, w, sym).second; top = nice(sym, nm); value = if (pc == null) "-" else pct1(pc); col = if ((pc ?: 0.0) >= 0) MINT else PINK }
                 "risk" -> { val sc = w?.optJSONObject("risk")?.optInt("score", -1) ?: -1; top = "RISK"; value = if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIX"; col = if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD }
                 "markets" -> { val n = Sessions.status(true).count { it.second }; top = "MARKETS"; value = if (n == 0) "Closed" else "$n open"; col = if (n > 0) MINT else DIM }
-                "nw" -> { top = "NET"; value = if (priv) "\u2022\u2022\u2022" else w?.optString("nwTxt") ?: "-" }
+                "nw" -> { top = "NET WORTH"; value = if (priv) "\u2022\u2022\u2022" else (w?.optString("nwTxt") ?: "-").replace(" ", "") }
                 else -> { top = kind.uppercase(); value = "-" }
             }
             v.setViewVisibility(R.id.head, View.GONE); v.setViewVisibility(R.id.chart, View.GONE)
             v.setTextViewText(R.id.big, top); v.setTextColor(R.id.big, DIM); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, 9.5f)
             v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, value); v.setTextColor(R.id.sub, col)
-            v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, (inner / (max(value.length, 3) * 0.72f)).coerceIn(9f, 18f))
+            v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, (inner / (max(value.length, 3) * 0.95f)).coerceIn(8f, 18f)); v.setInt(R.id.sub, "setMaxLines", 1)
         }
         if (cell && short && kind == "signal") { v.setViewVisibility(R.id.head, View.GONE); v.setImageViewBitmap(R.id.gauge, gauge((w?.optJSONArray("calls")?.optJSONObject(0)?.optDouble("score", Double.NaN) ?: Double.NaN).let { if (it.isNaN()) null else it }, ((hDp - 14) * dens).toInt(), dens)) }
         if (tall && kind != "watch" && kind != "markets" && !cell) { v.setViewVisibility(R.id.foot, View.VISIBLE); v.setTextViewText(R.id.foot, "Creampie Holdings") }
+        if (kind == "ticker" && wDp >= 200 && !short) updatedCorner(ctx, v, id)
+        if (kind == "ticker" && !cell) { v.setViewVisibility(R.id.edit, View.VISIBLE); v.setOnClickPendingIntent(R.id.edit, configIntent(ctx, id)) }
         v.setOnClickPendingIntent(R.id.root, open(ctx, route, 9100 + id))
         mgr.updateAppWidget(id, v)
     }
@@ -246,13 +278,28 @@ object WidgetKit {
     private fun nice(sym: String, name: String) = NICE[sym] ?: if (name.length in 1..7) name else short(sym)
     fun pct1(v: Double) = String.format(Locale.US, "%s%.1f%%", if (v >= 0) "+" else "−", abs(v))
     private fun short(sym: String) = sym.removePrefix(".").removePrefix("@").removeSuffix("-USD").removeSuffix("=").removeSuffix("-GB").removeSuffix(".1").take(6)
-    private fun rid(a: String, i: Int, b: String = "") = when ("$a$i$b") {
-        "row0" -> R.id.row0; "row1" -> R.id.row1; "row2" -> R.id.row2; "row3" -> R.id.row3; "row4" -> R.id.row4; "row5" -> R.id.row5
-        "r0n" -> R.id.r0n; "r1n" -> R.id.r1n; "r2n" -> R.id.r2n; "r3n" -> R.id.r3n; "r4n" -> R.id.r4n; "r5n" -> R.id.r5n
-        "r0v" -> R.id.r0v; "r1v" -> R.id.r1v; "r2v" -> R.id.r2v; "r3v" -> R.id.r3v; "r4v" -> R.id.r4v; else -> R.id.r5v
-    }
+    private var pkg = ""
+    private var resCtx: Context? = null
+    private fun rid(a: String, i: Int, b: String = ""): Int = resCtx!!.resources.getIdentifier("$a$i$b", "id", pkg)
+
 
     // ---------- small bitmaps ----------
+    fun multiGauge(list: List<JSONObject>, w: Int, h: Int, d: Float): Bitmap {
+        val bm = Bitmap.createBitmap(max(w, 20), max(h, 20), Bitmap.Config.ARGB_8888); val c = Canvas(bm)
+        val cols = if (list.size > 2) 2 else list.size; val rows = (list.size + cols - 1) / cols
+        val cw = bm.width / cols; val chh = bm.height / rows
+        val name = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE6E7F2.toInt(); textAlign = Paint.Align.CENTER }
+        list.forEachIndexed { i, o ->
+            val cx = (i % cols) * cw; val cy = (i / cols) * chh
+            val gs = (min(cw, chh) * 0.72f).toInt()
+            val sc = o.optDouble("score", Double.NaN)
+            c.drawBitmap(gauge(if (sc.isNaN()) null else sc, gs, d), (cx + (cw - gs) / 2).toFloat(), cy.toFloat(), null)
+            name.textSize = (chh * 0.13f).coerceIn(9 * d, 15 * d)
+            val v = o.optString("v"); name.color = if (v.contains("Buy")) MINT else if (v.contains("Sell")) PINK else if (v.isEmpty()) DIM else GOLD
+            c.drawText(nice(o.optString("sym"), o.optString("name")) + if (v.isNotEmpty()) " \u00B7 $v" else "", cx + cw / 2f, cy + gs + name.textSize * 1.1f, name)
+        }
+        return bm
+    }
     fun spark(vals: DoubleArray, w: Int, h: Int, holo: Boolean, d: Float): Bitmap {
         val bm = Bitmap.createBitmap(max(w, 10), max(h, 10), Bitmap.Config.ARGB_8888); val c = Canvas(bm)
         val lo = vals.min(); val hi = vals.max(); val pad = 3 * d

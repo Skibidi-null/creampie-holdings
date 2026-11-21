@@ -23,6 +23,8 @@ class App : Application() {
             NotificationChannel(Notifier.CH_REMIND, "Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Card bill & 9 pm reminder" },
         ))
         schedule()
+        // fresh widget prices when the phone is unlocked (only while the app process is alive)
+        runCatching { registerReceiver(RefreshReceiver(), android.content.IntentFilter(android.content.Intent.ACTION_USER_PRESENT)) }
     }
 
     fun schedule() {

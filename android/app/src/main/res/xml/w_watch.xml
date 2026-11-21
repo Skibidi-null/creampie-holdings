@@ -5,4 +5,5 @@
     android:resizeMode="horizontal|vertical" android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/w_holo" android:previewLayout="@layout/w_holo"
     android:description="@string/wd_watch"
+    android:configure="com.creampie.holdings.WidgetConfig" android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen" />

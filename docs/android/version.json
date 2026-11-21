@@ -1,8 +1,8 @@
 {
- "versionCode": 5,
- "versionName": "2.0.1",
- "url": "https://skibidi-null.github.io/creampie-holdings/android/CreampieHoldings-2.0.1.apk",
- "sha256": "82fe59cc8640627ec2047772b508416ae93859fa514cf1cceebeb94e694cbac2",
- "size": 1130297,
- "notes": "Creampie Holdings 2.0.1: the new HOLO design, interactive charts, the advisor with reasons and track record, several alerts per asset, world markets, practice trading, risk guard, encrypted backups and 8 resizable home-screen widgets. Alerts are now checked right after you change them."
+ "versionCode": 6,
+ "versionName": "2.0.2",
+ "url": "https://skibidi-null.github.io/creampie-holdings/android/CreampieHoldings-2.0.2.apk",
+ "sha256": "68a70e927d519db987a0e247b30bfa67e110919ddfc9e17bea4837cef87fe03b",
+ "size": 1134705,
+ "notes": "2.0.2: widgets fill every size (bigger text, more rows, larger gauges), choose the assets for Signal (up to 4) and Watchlist widgets with EDIT, prices refresh on unlock and on tap ('updated' time shown), plus a living animated background."
 }
