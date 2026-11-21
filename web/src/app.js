@@ -13,7 +13,13 @@ import { Hub } from './hub.js';
 import { AdvisorScreen } from './advisorScreen.js';
 import { World } from './world.js';
 import { AlertsScreen, startAlerts } from './alertsScreen.js';
+import { alertBus2 } from './alerts.js';
 import { NetWorthScreen } from './wealthPlus.js';
+import { Settings as Settings2, Backup as Backup2, Health } from './settings2.js';
+import { WealthTab, PortfolioHub, Benchmark, RiskCheck, Dividends, Tax, Freedom, Dca, WhatIf, Journal, Fees } from './invest.js';
+import { Practice, Guard } from './trading.js';
+import { Screener, Earnings, Insiders, Backtest } from './research.js';
+import { T212 as T212S, useT212 as useT212S } from './t212.js';
 import { Home } from './home.js';
 import { Activity } from './activity.js';
 import { AddSheet } from './add.js';
@@ -96,6 +102,14 @@ function Dock({ tab, onAdd }) {
   </nav>`;
 }
 
+// always-visible Trading 212 mode badge (Practice / LIVE)
+function EnvBadge() {
+  const t = useT212S();
+  if (!t.connected) return null;
+  const live = t.env === 'live';
+  return html`<button class=${`envbadge ${live ? 'live' : ''}`} onClick=${() => { location.hash = '#/broker'; }}>${live ? 'T212 LIVE' : 'T212 PRACTICE'}</button>`;
+}
+
 function App() {
   const s = useStore();
   const r = useRoute();
@@ -114,6 +128,8 @@ function App() {
     startAlerts();
     const onAsset = (text) => { toast(text, 'bell', 6000); localNotify('Price alert', text); };
     assetAlertBus.add(onAsset);
+    const onAl2 = ({ text, quiet }) => { toast(text, 'bell', 7000); if (!quiet) localNotify('Alert', text); };
+    alertBus2.add(onAl2);
     syncConfig();
     const onAlert = (a) => { toast(a.text, '!', 6000); localNotify('Gold price alert', a.text); };
     // new important early warnings while the app is open → banner (once each)
@@ -147,7 +163,7 @@ function App() {
     home: () => html`<${Home} openAdd=${openAdd} />`,
     activity: () => html`<${Activity} />`,
     gold: () => html`<${GoldScreen} />`,
-    wealth: () => html`<${Wealth} />`,
+    wealth: () => html`<${WealthTab} />`,
     news: () => html`<div class="screen"><${Back} title=${T.news} hint="Gold news & what it might mean" onBack=${() => history.back()} /><${NewsScreen} /></div>`,
     markets: () => html`<${Markets} />`,
     more: () => html`<${Hub} />`,
@@ -156,7 +172,13 @@ function App() {
     alerts: () => html`<${AlertsScreen} arg=${r.arg} key=${r.arg} />`,
     networth: () => html`<${NetWorthScreen} />`,
     asset: () => html`<${Asset} sym=${decodeURIComponent(r.arg || '')} key=${r.arg} />`,
-    portfolio: () => html`<${Portfolio} />`,
+    portfolio: () => html`<${PortfolioHub} />`,
+    t212: () => html`<${Portfolio} />`,
+    benchmark: () => html`<${Benchmark} />`, riskcheck: () => html`<${RiskCheck} />`, dividends: () => html`<${Dividends} />`, tax: () => html`<${Tax} />`,
+    freedom: () => html`<${Freedom} />`, dca: () => html`<${Dca} />`, whatif: () => html`<${WhatIf} />`, journal: () => html`<${Journal} />`, fees: () => html`<${Fees} />`,
+    practice: () => html`<${Practice} arg=${r.arg} key=${r.arg || 'p'} />`, guard: () => html`<${Guard} />`,
+    screener: () => html`<${Screener} />`, earnings: () => html`<${Earnings} />`, insiders: () => html`<${Insiders} />`, backtest: () => html`<${Backtest} />`,
+    health: () => html`<${Health} />`,
     broker: () => html`<${Broker} />`,
     accounts: () => html`<${Accounts} />`,
     card: () => html`<${Card} />`,
@@ -168,13 +190,14 @@ function App() {
     summary: () => html`<${Summary} ym=${r.arg} key=${r.arg} />`,
     zakat: () => html`<${Zakat} />`,
     convert: () => html`<${Convert} />`,
-    backup: () => html`<${Backup} />`,
-    settings: () => html`<${Settings} />`,
+    backup: () => html`<${Backup2} />`,
+    settings: () => html`<${Settings2} />`,
     setup: () => html`<${Setup} />`,
   };
   const Screen = screens[r.name] || screens.home;
   return html`<div>
     <div key=${r.name}>${Screen()}</div>
+    <${EnvBadge} />
     <${Dock} tab=${tab || (TABS.includes(r.name) ? r.name : '')} onAdd=${() => { vibrate(15); openAdd('exp'); }} />
     ${sheet && html`<${AddSheet} ...${sheet} onClose=${() => setSheet(null)} />`}
     <${Toaster} />

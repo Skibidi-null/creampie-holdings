@@ -45,8 +45,8 @@ export class T212Error extends Error { constructor(status, msg) { super(msg); th
 const explain = (status, body) => {
   let m = ''; try { const j = JSON.parse(body); m = j.message || j.detail || j.title || j.error || (j.code ? String(j.code) : ''); } catch { m = (body || '').slice(0, 160); }
   if (status === 401) return 'Trading 212 rejected the key. Check the API key and secret (and that it\'s for the right account: Practice or Real).';
-  if (status === 403) return `This key doesn't have permission for that${m ? ` (${m})` : ''}. In Trading 212, create a key with Account, Portfolio, Orders (read + execute), Metadata and History enabled.`;
-  if (status === 429) return 'Too many requests. Trading 212 allows only a few per second. Try again in a few seconds.';
+  if (status === 403) { const sc = /Scope\(\s*([\w:]+)\s*\)/.exec(m); return `This key doesn't have permission for that${sc ? ` (missing "${sc[1]}")` : m ? ` (${m})` : ''}. In Trading 212, create a key with Account, Portfolio, Orders (read + execute), Metadata, History and Pies enabled.`; }
+  if (status === 429) return `Too many requests${m ? ` (${m})` : ''}. Trading 212 allows only a few per second. Try again in a few seconds.`;
   if (status === 408 || status === 0) return 'Trading 212 didn\'t answer in time. Check your internet and try again.';
   if (status === 400 && /quantity|precision|decimal|fraction|minimum|min/i.test(m)) return `Trading 212 refused the amount: ${m}. Try a round number of shares or a slightly bigger amount.`;
   if (status === 400) return `Trading 212 refused the order${m ? `: ${m}` : ''}.`;
@@ -56,14 +56,17 @@ const explain = (status, body) => {
 };
 
 // minimum time between calls per endpoint (Trading 212 rate limits)
-const GAP = { 'account/summary': 5000, positions: 1100, orders: 5000, 'metadata/instruments': 50000, 'history/orders': 3100, 'orders/limit': 2000, 'orders/stop': 2000, 'orders/stop_limit': 2000, 'orders/market': 1200 };
+// official limits: summary 1/5s, positions 1/1s, orders 1/5s, order by id 1/1s, market 50/1m, limit/stop/stop_limit 1/2s,
+// history 20/1m, instruments 1/50s, exchanges 1/30s, pies list 1/30s, pie 1/5s
+const GAP = { 'account/summary': 5000, positions: 1050, orders: 5000, 'orders/id': 1050, 'metadata/instruments': 50000, 'metadata/exchanges': 30000, 'history/orders': 3100, 'history/dividends': 3100, 'history/transactions': 3100, 'orders/limit': 2000, 'orders/stop': 2000, 'orders/stop_limit': 2000, 'orders/market': 1200, pies: 30000, 'pies/id': 5000 };
 const lastCall = {};
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function call(method, path, body, env = T212.env, creds) {
   const c = creds || T212.creds(env);
   if (!c || !c.key || !c.secret) throw new T212Error(401, 'Not connected');
-  const ep = path.replace(/^\/api\/v0\/equity\//, '').replace(/\?.*$/, '').replace(/\/\d+$/, '');
+  const ep0 = path.replace(/^\/api\/v0\/equity\//, '').replace(/\?.*$/, '');
+  const ep = /^orders\/\d+$/.test(ep0) && method === 'GET' ? 'orders/id' : /^pies\/\d+/.test(ep0) ? 'pies/id' : ep0.replace(/\/\d+$/, '');
   const gap = GAP[ep] || 0; const k = env + ep;
   const since = Date.now() - (lastCall[k] || 0); if (since < gap) await wait(gap - since);
   lastCall[k] = Date.now();
@@ -87,7 +90,19 @@ export const summary = (env, creds) => call('GET', `${P}/account/summary`, null,
 export const positions = () => call('GET', `${P}/positions`);
 export const pendingOrders = () => call('GET', `${P}/orders`);
 export const cancelOrder = (id) => call('DELETE', `${P}/orders/${id}`);
-export const orderHistory = (limit = 20) => call('GET', `${P}/history/orders?limit=${limit}`);
+// history endpoints are paginated: follow nextPagePath until null (all=true reads up to `max` pages)
+async function paged(path, limit, all, max = 20) {
+  let r = await call('GET', `${path}${path.includes('?') ? '&' : '?'}limit=${limit}`); const items = [...((r && r.items) || [])];
+  let n = 1; while (all && r && r.nextPagePath && n < max) { r = await call('GET', r.nextPagePath.startsWith('/api') ? r.nextPagePath : `${P}/${r.nextPagePath.replace(/^\//, '')}`); items.push(...((r && r.items) || [])); n++; }
+  return { items, more: !!(r && r.nextPagePath) };
+}
+export const orderHistory = (limit = 20, all = false) => paged(`${P}/history/orders`, Math.min(50, limit), all);
+export const dividendHistory = (limit = 50, all = false) => paged(`${P}/history/dividends`, Math.min(50, limit), all);
+export const transactionHistory = (limit = 50, all = false) => paged(`${P}/history/transactions`, Math.min(50, limit), all);
+export const orderById = (id) => call('GET', `${P}/orders/${id}`);
+export const pies = () => call('GET', `${P}/pies`);
+export const pie = (id) => call('GET', `${P}/pies/${id}`);
+export const exchanges = () => call('GET', `${P}/metadata/exchanges`);
 const qty = (side, q) => +(side === 'SELL' ? -Math.abs(q) : Math.abs(q)).toFixed(6);
 export function placeOrder({ type, side, ticker, quantity, limitPrice, stopPrice, timeValidity = 'DAY', extendedHours = false }) {
   const q = qty(side, quantity);

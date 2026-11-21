@@ -238,7 +238,7 @@ export function Settings() {
   </div>`;
 }
 
-function PinSheet({ onClose }) {
+export function PinSheet({ onClose }) {
   const s = useStore();
   const [a, setA] = useState('');
   const [b, setB] = useState('');
@@ -255,7 +255,7 @@ function PinSheet({ onClose }) {
 }
 
 const EMOJIS = ['🍔', '🍕', '🥙', '🛍️', '🎮', '🎬', '🍺', '🚬', '💊', '🐶', '👶', '🏋️', '📦', '🧾', '💄', '🎉', '⛽', '🅿️', '🧺', '🛠️'];
-function CatSheet({ onClose }) {
+export function CatSheet({ onClose }) {
   const s = useStore();
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('🛍️');

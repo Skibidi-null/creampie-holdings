@@ -14,7 +14,9 @@ import { describe, updateAlert, KINDS } from './alerts.js';
 import { fearGreed } from './data.js';
 import { feedback } from './fx.js';
 import { T212C, useT212, T212, setEnv, setRelay, saveCreds, forget, summary, positions, pendingOrders, cancelOrder, orderHistory, placeOrder, findInstrument, tickerToSym, T212Error } from './t212.js';
-import { num, parseNum } from './util.js';
+import { num, parseNum, money as dispMoney, DISP } from './util.js';
+import { guardState, coolingNeeded, coolingLeft, startCooling, coolingDone, clearCooling, trackDayStart, liveAllowed } from './guard.js';
+import { addJournal } from './invest.js';
 
 const go = (r) => { location.hash = '#/' + r; };
 const pctTxt = (v, d = 2) => (v == null || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}%`);
@@ -29,7 +31,7 @@ async function refreshPortfolio(full) {
   try {
     pf.pos = await positions();
     if (full || !pf.sum || Date.now() - pf.at > 15e3) { pf.sum = await summary(); pf.ord = await pendingOrders(); pf.at = Date.now(); }
-    pf.err = null;
+    pf.err = null; trackDayStart();
   } catch (e) { pf.err = e.message; }
   pfSubs.forEach((f) => f({}));
 }
@@ -220,7 +222,7 @@ function OldAlertSheet({ sym, price, onClose }) {
 }
 
 // ================= trade =================
-function TradeSheet({ sym, side: side0, inst, q, pos, onClose }) {
+function TradeSheet({ sym, side: side0, inst, q, pos, onClose, an }) {
   const s = useStore();
   const t = useT212();
   const [side, setSide] = useState(side0);
@@ -233,11 +235,15 @@ function TradeSheet({ sym, side: side0, inst, q, pos, onClose }) {
   const [validity, setValidity] = useState('DAY');
   const [ext, setExt] = useState(false);
   const [step, setStep] = useState('form'); // form | review | sending | done
+  const [skipCool, setSkipCool] = useState(false);
+  const [, tick] = useState(0);
+  useEffect(() => { const i = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(i); }, []);
+  const gs = guardState();
   const [result, setResult] = useState(null);
   const [err, setErr] = useState(null);
   const acct = (pf.sum && pf.sum.currency) || 'PLN';
   const nowPx = q ? (q.ext && q.status !== 'REG_MKT' ? q.ext.last : q.last) : NaN; // pre/after-hours price when the main session is closed
-  const price = type === 'LIMIT' ? parseNum(limit) : type === 'STOP' ? parseNum(stop) : nowPx;
+  const price = type === 'LIMIT' || type === 'STOP_LIMIT' ? parseNum(limit) : type === 'STOP' ? parseNum(stop) : nowPx;
   const instCur = (inst && inst.currency) || 'USD';
   const fx = acct === instCur ? 1 : acct === 'PLN' ? (s.rates[instCur === 'GBX' ? 'GBP' : instCur] || 0) * (instCur === 'GBX' ? 0.01 : 1) : 0; // account currency per 1 unit of the stock's currency
   const v = parseNum(val);
@@ -251,23 +257,30 @@ function TradeSheet({ sym, side: side0, inst, q, pos, onClose }) {
   if (side === 'SELL' && qty > avail + 1e-9) problems.push(`You have ${num(avail, 4)} shares available to sell`);
   if (side === 'BUY' && cash != null && estCost != null && estCost > cash * 1.0) problems.push(`Estimated cost ${money(estCost, acct)} is more than your cash ${money(cash, acct)}`);
   if (type !== 'MARKET' && !(price > 0)) problems.push('Enter a price');
+  if (type === 'STOP_LIMIT' && !(parseNum(stop) > 0)) problems.push('Enter a stop price');
+  if (gs.locked && side === 'BUY') problems.unshift(`Risk guard: you lost ${num(gs.loss || 0, 2)} ${gs.cur} today, over your ${num(gs.limit, 2)} limit. New buys are locked until tomorrow. Selling is still allowed.`);
+  const cool = coolingNeeded({ side, cost: estCost, portfolio: pf.sum ? pf.sum.totalValue : null, verdictDir: an && an.score != null ? an.verdict.dir : null, dayPct: q && q.pct });
+  const coolLeft = cool ? coolingLeft(sym) : 0;
+  const coolBlock = cool && !skipCool && !coolingDone(sym);
   const live = t.env === 'live';
   const send = async () => {
     setStep('sending'); setErr(null);
     try {
       const r = await placeOrder({ type, side, ticker: inst.ticker, quantity: qty, limitPrice: limit, stopPrice: stop, timeValidity: validity, extendedHours: ext });
-      setResult(r); setStep('done'); refreshPortfolio(true);
-    } catch (e) { setErr(e.message); setStep('review'); }
+      setResult(r); setStep('done'); refreshPortfolio(true); feedback(side === 'BUY' ? 'buy' : 'sell'); clearCooling(sym);
+      addJournal({ sym, side, qty, px: price || nowPx, cur: instCur, real: t.env === 'live', why: an && an.score != null ? `Advisor ${an.verdict.label} ${an.score}` : '', t212: true });
+    } catch (e) { setErr(e.message); setStep('review'); feedback('error'); }
   };
-  const typeName = { MARKET: 'Market (now)', LIMIT: 'Limit (at my price or better)', STOP: 'Stop (when price reaches)' }[type];
+  const typeName = { MARKET: 'Market (now)', LIMIT: 'Limit (at my price or better)', STOP: 'Stop (when price reaches)', STOP_LIMIT: 'Stop-limit' }[type];
   return html`<${Sheet} title=${`${side === 'BUY' ? 'Buy' : 'Sell'} ${cleanSym(sym)}`} onClose=${onClose}>${(close) => html`
     <div class=${`envbar ${live ? 'live' : ''}`}>${live ? 'REAL MONEY · Trading 212' : 'PRACTICE account · no real money'}</div>
     ${step === 'form' && html`
       <div style="margin-bottom:12px"><${Seg} options=${[['BUY', 'Buy'], ['SELL', 'Sell']]} value=${side} onChange=${setSide} /></div>
-      <${Field} label="Order type"><${Seg} options=${[['MARKET', 'Market'], ['LIMIT', 'Limit'], ['STOP', 'Stop']]} value=${type} onChange=${setType} />
-        <div class="hint" style="margin:6px 2px">${type === 'MARKET' ? 'Fills right away at the best available price.' : type === 'LIMIT' ? (side === 'BUY' ? 'Buys only at your price or LOWER.' : 'Sells only at your price or HIGHER.') : (side === 'BUY' ? 'Buys once the price RISES to your level.' : 'Sells once the price FALLS to your level (stop-loss).')}</div><//>
+      <${Field} label="Order type"><${Seg} options=${[['MARKET', 'Market'], ['LIMIT', 'Limit'], ['STOP', 'Stop'], ['STOP_LIMIT', 'Stop-limit']]} value=${type} onChange=${setType} />
+        <div class="hint" style="margin:6px 2px">${type === 'MARKET' ? 'Fills right away at the best available price.' : type === 'LIMIT' ? (side === 'BUY' ? 'Buys only at your price or LOWER.' : 'Sells only at your price or HIGHER.') : type === 'STOP' ? (side === 'BUY' ? 'Buys once the price RISES to your level.' : 'Sells once the price FALLS to your level (stop-loss).') : 'When the stop price is reached, a limit order at your limit price is placed.'}</div><//>
       ${type === 'LIMIT' && html`<${Field} label=${`Limit price (${instCur})`}><${NumInput} value=${limit} onInput=${setLimit} /><//>`}
-      ${type === 'STOP' && html`<${Field} label=${`Stop price (${instCur})`}><${NumInput} value=${stop} onInput=${setStop} /><//>`}
+      ${(type === 'STOP' || type === 'STOP_LIMIT') && html`<${Field} label=${`Stop price (${instCur})`}><${NumInput} value=${stop} onInput=${setStop} /><//>`}
+      ${type === 'STOP_LIMIT' && html`<${Field} label=${`Limit price (${instCur})`}><${NumInput} value=${limit} onInput=${setLimit} /><//>`}
       <${Field} label=${mode === 'amount' ? `Amount (${acct})` : 'Number of shares'}>
         <div style="margin-bottom:8px"><${Seg} options=${[['amount', `In ${acct === 'PLN' ? 'zł' : acct}`], ['shares', 'In shares']]} value=${mode} onChange=${(m) => { setMode(m); setVal(''); }} /></div>
         <${NumInput} value=${val} onInput=${setVal} placeholder=${mode === 'amount' ? '500' : '1'} autofocus />
@@ -284,8 +297,12 @@ function TradeSheet({ sym, side: side0, inst, q, pos, onClose }) {
         <span>Estimated ${side === 'BUY' ? 'cost' : 'you get'}</span><span>${estCost != null ? '≈ ' + money(estCost, acct) : '—'}</span>
         ${cash != null && html`<span>Cash to trade</span><span>${money(cash, acct)}</span>`}
       </div>${instCur !== acct && html`<div class="hint" style="margin-top:6px">Trading 212 converts ${acct} → ${instCur} and charges a small FX fee (about 0.15%).</div>`}</div>
-      ${problems.length > 0 && val && html`<div class="note warn">${problems[0]}</div>`}
-      <button class="btn primary block" disabled=${problems.length > 0} onClick=${() => setStep('review')}>Review order</button>
+      ${problems.length > 0 && (val || gs.locked) && html`<div class=${gs.locked && side === 'BUY' ? 'callout bad' : 'note warn'} style="margin-bottom:8px">${problems[0]}</div>`}
+      ${cool && !problems.length && html`<div class="callout" style="margin-bottom:10px"><b style="font-weight:600">Cooling-off.</b> This buy is ${cool.pct.toFixed(0)}% of your portfolio and ${cool.reasons.join(' and ')}.
+        ${coolLeft > 0 ? html`<div class="mono" style="margin-top:8px;font-size:18px">${Math.floor(coolLeft / 60000)}:${String(Math.floor((coolLeft % 60000) / 1000)).padStart(2, '0')}</div><div class="hint">You can review the order when the timer ends.</div>`
+          : coolingDone(sym) ? html`<div class="hint" style="margin-top:6px">Wait finished. Still want it?</div>` : html`<div class="btns" style="margin-top:10px"><button class="btn sm" onClick=${() => { startCooling(sym, cool.mins); feedback('set'); }}>Wait ${cool.mins} minutes</button></div>
+          <label class="row" style="margin-top:10px;font-size:12.5px;gap:8px"><input type="checkbox" checked=${skipCool} onChange=${(e) => setSkipCool(e.target.checked)} /> I have thought about it and want to skip the wait</label>`}</div>`}
+      <button class=${`btn block big ${side === 'BUY' ? 'buy' : 'sell'}`} disabled=${problems.length > 0 || coolBlock} onClick=${() => setStep('review')}>Review order</button>
     `}
     ${(step === 'review' || step === 'sending') && html`
       <div class="card"><div class="kv">
@@ -293,11 +310,14 @@ function TradeSheet({ sym, side: side0, inst, q, pos, onClose }) {
         <span>Instrument</span><span>${inst.name}</span>
         <span>Type</span><span>${typeName}</span>
         ${type === 'LIMIT' && html`<span>Limit price</span><span>${fmtPrice(+limit, sym)}</span>`}
-        ${type === 'STOP' && html`<span>Stop price</span><span>${fmtPrice(+stop, sym)}</span>`}
+        ${(type === 'STOP' || type === 'STOP_LIMIT') && html`<span>Stop price</span><span>${fmtPrice(+stop, sym)}</span>`}
+        ${type === 'STOP_LIMIT' && html`<span>Limit price</span><span>${fmtPrice(+limit, sym)}</span>`}
         ${type !== 'MARKET' && html`<span>Valid</span><span>${validity === 'DAY' ? 'Today only' : 'Until cancelled'}</span>`}
         <span>Estimated total</span><span>≈ ${money(estCost, acct)}</span>
+        ${DISP.cur !== acct && html`<span>In ${DISP.cur}</span><span>≈ ${dispMoney(estCost, acct)}</span>`}
       </div></div>
       ${type === 'MARKET' && q && !q.open && !ext && html`<div class="note warn" style="margin-bottom:10px">The market is closed now, so this order will fill when it opens, at the opening price (which can be different).</div>`}
+      ${live && html`<div class="callout bad" style="margin-bottom:10px">This uses REAL money from your Trading 212 account.</div>`}
       ${err && html`<div class="callout bad" style="margin-bottom:10px">${err}</div>`}
       <div class="btns">
         <button class="btn" disabled=${step === 'sending'} onClick=${() => setStep('form')}>Back</button>
@@ -372,7 +392,7 @@ export function Broker() {
     if (!t.native && relay !== t.relay) setRelay(relay);
     try {
       const sum = await summary(env, { key: key.trim(), secret: secret.trim() });
-      saveCreds(env, key, secret, true); setEnv(env);
+      saveCreds(env, key, secret, true); if (env !== 'live' || liveAllowed()) setEnv(env);
       setSt({ ok: `Connected to account ${sum.id} (${sum.currency}). Total value ${money(sum.totalValue, sum.currency)}.` });
       refreshPortfolio(true);
     } catch (e) { setSt({ err: e.message }); }
@@ -384,7 +404,8 @@ export function Broker() {
       <b>Account</b>
       <div style="margin:10px 0"><${Seg} options=${[['demo', 'Practice'], ['live', 'Real money']]} value=${env} onChange=${(e) => { setE(e); const k = t.creds(e) || {}; setKey(k.key || ''); setSecret(k.secret || ''); setSt(null); }} /></div>
       <div class="hint">${env === 'demo' ? 'Start here: practice with fake money first to check everything works.' : 'Orders will use your REAL money.'}</div>
-      ${connected('demo') || connected('live') ? html`<div class="chips" style="margin-top:10px">${['demo', 'live'].filter(connected).map((x) => html`<button class=${`chip ${t.env === x ? 'on' : ''}`} onClick=${() => { setEnv(x); toast(`Using ${x === 'live' ? 'Real money' : 'Practice'}`); }}>Use ${x === 'live' ? 'Real' : 'Practice'}</button>`)}</div>` : ''}
+      ${env === 'live' && !liveAllowed() && html`<div class="callout bad" style="margin-top:10px">Before Real money can be used, set a daily loss limit in the Risk guard. <button class="btn sm" style="margin-top:8px" onClick=${() => go('guard')}>Open Risk guard</button></div>`}
+      ${connected('demo') || connected('live') ? html`<div class="chips" style="margin-top:10px">${['demo', 'live'].filter(connected).map((x) => html`<button class=${`chip ${t.env === x ? 'on' : ''}`} onClick=${() => { if (x === 'live' && !liveAllowed()) { feedback('error'); toast('Set up the Risk guard before using Real money', '!'); go('guard'); return; } setEnv(x); toast(`Using ${x === 'live' ? 'Real money' : 'Practice'}`); }}>Use ${x === 'live' ? 'Real' : 'Practice'}</button>`)}</div>` : ''}
     </div>
     <div class="card">
       <b>1. Create an API key in Trading 212</b>
@@ -396,7 +417,7 @@ export function Broker() {
       <${Field} label="API secret"><input class="input mono" type="password" value=${secret} onInput=${(e) => setSecret(e.target.value)} autocomplete="off" autocapitalize="off" spellcheck="false" /><//>
       ${!t.native && html`<${Field} label="iPhone relay address"><input class="input mono" value=${relay} onInput=${(e) => setR(e.target.value)} placeholder="https://creampie-relay.<name>.workers.dev" autocapitalize="off" spellcheck="false" />
         <div class="hint" style="margin:4px 2px">iPhone only. Trading 212 blocks browser apps, so requests go through your own free Cloudflare relay. It passes them on and stores nothing.</div><//>`}
-      <button class="btn primary block" disabled=${!key.trim() || !secret.trim() || (st && st.busy) || (!t.native && !relay.trim())} onClick=${test}>${st && st.busy ? 'Checking…' : 'Connect & test'}</button>
+      <button class="btn primary block" disabled=${!key.trim() || !secret.trim() || (st && st.busy) || (!t.native && !relay.trim()) || (env === 'live' && !liveAllowed())} onClick=${test}>${st && st.busy ? 'Checking…' : 'Connect & test'}</button>
       ${st && st.ok && html`<div class="callout good" style="margin-top:10px">${st.ok}</div>`}
       ${st && st.err && html`<div class="callout bad" style="margin-top:10px">${st.err}</div>`}
     </div>
