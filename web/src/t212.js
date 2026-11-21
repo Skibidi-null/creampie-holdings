@@ -138,9 +138,10 @@ export function instruments() {
 // CNBC symbol (e.g. NVDA, BRK.B) → Trading 212 instrument
 export async function findInstrument(sym) {
   const list = await instruments();
-  const s = sym.toUpperCase().replace('.', '');
+  const lse = /-GB$/.test(sym); // CNBC London listing, e.g. VUAA-GB -> Trading 212 VUAAl_EQ
+  const s = sym.toUpperCase().replace(/-[A-Z]{2}$/, '').replace('.', '');
   const hits = list.filter((x) => x[1] && x[1].toUpperCase().replace('.', '') === s);
-  const best = hits.find((x) => /_US_EQ$/.test(x[0])) || hits[0];
+  const best = (lse ? hits.find((x) => /l_EQ$/.test(x[0])) : hits.find((x) => /_US_EQ$/.test(x[0]))) || hits[0];
   return best ? { ticker: best[0], shortName: best[1], type: best[2], currency: best[3], name: best[4], extendedHours: !!best[5], isin: best[6] } : null;
 }
-export const tickerToSym = (t) => (t || '').replace(/_US_EQ$/, '').replace(/_EQ$/, '').replace(/_[A-Z]{2}$/, '');
+export const tickerToSym = (t) => { t = t || ''; if (/^[A-Z0-9]+l_EQ$/.test(t)) return t.replace(/l_EQ$/, '') + '-GB'; return t.replace(/_US_EQ$/, '').replace(/[a-z]?_EQ$/, '').replace(/_[A-Z]{2}$/, ''); };

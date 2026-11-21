@@ -65,8 +65,9 @@ export function SignalPanel({ sym, an, onAlert, onTrade, canTrade }) {
   const s = useStore();
   const r = an.res;
   const [open, setOpen] = useState(false);
-  if (!r) return html`<div class="card"><div class="row" style="gap:14px"><${Gauge} score=${null} size=${76} /><div class="grow"><div class="call hold" style="font-size:18px;color:var(--dim)">Reading signals…</div><div class="hint">Trend, momentum, macro, sentiment, positioning and history</div></div></div></div>`;
-  if (r.score == null) return html`<div class="card"><div class="row" style="gap:14px"><${Gauge} score=${null} size=${76} /><div class="grow"><b>Signal unavailable</b><div class="hint">${r.err || 'Not enough data'}</div></div></div></div>`;
+  const tradeBtns = canTrade && html`<div class="btns" style="margin-top:14px"><button class="btn buy big" onClick=${() => onTrade('BUY')}>Buy</button><button class="btn sell big" onClick=${() => onTrade('SELL')}>Sell</button></div>`;
+  if (!r) return html`<div class="card"><div class="row" style="gap:14px"><${Gauge} score=${null} size=${76} /><div class="grow"><div class="call hold" style="font-size:18px;color:var(--dim)">Reading signals…</div><div class="hint">Trend, momentum, macro, sentiment, positioning and history</div></div></div>${tradeBtns}</div>`;
+  if (r.score == null) return html`<div class="card"><div class="row" style="gap:14px"><${Gauge} score=${null} size=${76} /><div class="grow"><b>Signal unavailable</b><div class="hint">${r.err || 'Not enough data'}</div></div></div>${tradeBtns}</div>`;
   const bt = r.bt; const side = r.verdict.dir > 0 ? 'buy' : r.verdict.dir < 0 ? 'sell' : null;
   const b20 = bt && side ? bt[side][1] : null;
   // position size from net worth (investable) in zł
@@ -112,7 +113,7 @@ export function SignalPanel({ sym, an, onAlert, onTrade, canTrade }) {
       <div class="note" style="margin-top:6px">Compare the signal rows with "Any day": the edge is the difference. Macro, sentiment and positioning factors are not in this backtest (not enough free history).</div>
     </details>`}
     <div class="btns" style="margin-top:14px">
-      ${canTrade ? html`<button class=${`btn ${r.verdict.dir < 0 ? 'sell' : 'buy'} big`} onClick=${() => onTrade(r.verdict.dir < 0 ? 'SELL' : 'BUY')}>${r.verdict.dir < 0 ? 'Sell' : 'Buy'}</button>` : html`<button class="btn buy big" onClick=${() => go('practice/' + encodeURIComponent(sym))}>Practice trade</button>`}
+      ${canTrade ? html`<button class="btn buy big" onClick=${() => onTrade('BUY')}>Buy</button><button class="btn sell big" onClick=${() => onTrade('SELL')}>Sell</button>` : html`<button class="btn buy big" onClick=${() => go('practice/' + encodeURIComponent(sym))}>Practice trade</button>`}
       <button class="btn big" onClick=${onAlert}>Alert me</button>
     </div>
     <div class="disclaim">${DISCLAIMER}</div>

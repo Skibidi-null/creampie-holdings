@@ -13,7 +13,7 @@ import { AlertSheet } from './alertsScreen.js';
 import { describe, updateAlert, KINDS } from './alerts.js';
 import { fearGreed } from './data.js';
 import { feedback } from './fx.js';
-import { T212C, useT212, T212, setEnv, setRelay, saveCreds, forget, summary, positions, pendingOrders, cancelOrder, orderHistory, placeOrder, findInstrument, tickerToSym, T212Error } from './t212.js';
+import { pies as t212Pies, T212C, useT212, T212, setEnv, setRelay, saveCreds, forget, summary, positions, pendingOrders, cancelOrder, orderHistory, placeOrder, findInstrument, tickerToSym, T212Error } from './t212.js';
 import { num, parseNum, money as dispMoney, DISP } from './util.js';
 import { guardState, coolingNeeded, coolingLeft, startCooling, coolingDone, clearCooling, trackDayStart, liveAllowed } from './guard.js';
 import { addJournal } from './invest.js';
@@ -49,9 +49,10 @@ function usePortfolio(ms = 10000) {
 }
 
 // ================= Markets home =================
+const SP500 = [['VUAA-GB', 'Vanguard S&P 500 (VUAA)', 'Accumulating, USD, 0.07% a year'], ['CSPX-GB', 'iShares Core S&P 500 (CSPX)', 'Accumulating, USD, 0.07% a year'], ['VUSA-GB', 'Vanguard S&P 500 (VUSA)', 'Pays dividends, GBP, 0.07% a year'], ['.SPX', 'S&P 500 index', 'For watching only']];
 export function Markets() {
   const s = useStore();
-  const a = useAssetsLive();
+  const a = useAssetsLive(SP500.map((x) => x[0]));
   const t = useT212();
   const p = usePortfolio(15000);
   const [sheet, setSheet] = useState(null);
@@ -78,6 +79,11 @@ export function Markets() {
       <div class="row"><span class="tile-ic-lg acc"><${Icon} n="swap" size=${20} /></span><div class="grow"><b>Connect Trading 212</b><div class="hint">See your portfolio and buy or sell from here</div></div><${Icon} n="chevron" size=${16} cls="mute" /></div>
     </div>`}
 
+    <div class="sect"><span class="h-title">S&P 500 with Trading 212</span></div>
+    <div class="card" style="padding:4px 14px">${SP500.map(([sym, nm, d]) => { const q = a.q[sym]; return html`<button class="item" onClick=${() => go('asset/' + encodeURIComponent(sym))}>
+      <span class="em sym">${cleanSym(sym).slice(0, 4)}</span><div class="grow"><div class="t1">${nm}</div><div class="t2">${d}</div></div>
+      <div style="text-align:right"><div class="mono" style="font-size:13px">${q ? fmtPrice(q.last, sym) : '\u2026'}</div>${q && q.pct != null && html`<span class=${`chg ${q.pct >= 0 ? 'up' : 'down'}`}>${pctTxt(q.pct)}</span>`}</div></button>`; })}
+      <div class="note" style="padding:6px 0 10px">Trading 212 has no S&P 500 CFD in its API. These UCITS ETFs track the index and can be bought here (US-listed ETFs like SPY are not sold to EU investors). Or buy the biggest companies one by one.</div></div>
     <div class="sect"><span class="h-title">Watchlist</span><button class="more" onClick=${() => setEdit(!edit)}>${edit ? 'Done' : 'Edit'}</button></div>
     <div class="card" style="padding:2px 14px">
       ${list.length ? list.map((w, i) => html`<${WatchRow} w=${w} q=${a.q[w.sym]} edit=${edit} first=${i === 0} last=${i === list.length - 1} />`) : html`<div class="empty">Your watchlist is empty.</div>`}
@@ -338,6 +344,8 @@ export function Portfolio() {
   const a = useAssetsLive((p.pos || []).map((x) => tickerToSym(x.instrument.ticker)).filter((x) => x && !/[a-z]/.test(x)));
   const [hist, setHist] = useState(null);
   useEffect(() => { if (t.connected) orderHistory(20).then((r) => setHist(r.items || [])).catch(() => setHist([])); }, [t.connected, t.env]);
+  const [pieList, setPies] = useState(null);
+  useEffect(() => { if (t.connected) t212Pies().then((r) => setPies(Array.isArray(r) ? r : [])).catch(() => setPies([])); }, [t.connected, t.env]);
   if (!t.connected) return html`<div class="screen"><${Back} title="Portfolio" onBack=${() => history.back()} /><div class="card"><b>Not connected</b><div class="hint" style="margin:6px 0 10px">Connect Trading 212 to see your portfolio.</div><button class="btn primary" onClick=${() => go('broker')}>Connect</button></div></div>`;
   const cur = p.sum ? p.sum.currency : 'PLN';
   const posList = [...(p.pos || [])].sort((x, y) => y.walletImpact.currentValue - x.walletImpact.currentValue);
@@ -369,6 +377,8 @@ export function Portfolio() {
           <div class="t2">${o.type}${o.limitPrice ? ' @ ' + o.limitPrice : ''}${o.stopPrice ? ' stop ' + o.stopPrice : ''} · ${(o.status || '').toLowerCase()}</div></div>
         <button class="btn sm danger" onClick=${async () => { if (!confirm('Cancel this order?')) return; try { await cancelOrder(o.id); toast('Cancel requested'); refreshPortfolio(true); } catch (e) { toast(e.message, '!', 6000); } }}>Cancel</button>
       </div>`)}</div>`}
+    ${pieList && pieList.length > 0 && html`<div class="sect"><span class="h-title">Pies</span></div><div class="card" style="padding:2px 14px">${pieList.map((pi) => html`<div class="item"><span class="em"><${Icon} n="pie" size=${17} /></span><div class="grow"><div class="t1">Pie #${pi.id}</div><div class="t2">${pi.status ? pi.status.replace(/_/g, ' ').toLowerCase() : ''}${pi.progress != null ? ` \u00B7 goal ${Math.round(pi.progress * 100)}%` : ''}</div></div>
+      <div style="text-align:right"><div class="mono">${pi.result ? money(pi.result.priceAvgValue, cur) : ''}</div>${pi.result && html`<span class=${`chg ${pi.result.priceAvgResult >= 0 ? 'up' : 'down'}`}>${pctTxt((pi.result.priceAvgResultCoef || 0) * 100, 1)}</span>`}</div></div>`)}</div>`}
     <div class="sect"><span class="h-title">Recent orders</span></div>
     <div class="card" style="padding:2px 14px">${hist == null ? html`<div class="hint" style="padding:12px 0">Loading…</div>` : !hist.length ? html`<div class="hint" style="padding:12px 0">No orders yet.</div>` : hist.map((h) => { const o = h.order || h; const f = h.fill || {}; return html`<div class="item">
       <div class="grow"><div class="t1">${o.side || ''} ${num(Math.abs(o.filledQuantity || o.quantity || 0), 4)} ${tickerToSym(o.ticker || (o.instrument && o.instrument.ticker))}</div>
