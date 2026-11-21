@@ -392,6 +392,10 @@ export function SeriesChart({ data, height = 220, fmt = (v) => v.toFixed(2), col
   }, []);
   useEffect(() => {
     const s = st.current; if (!ready || !s.ch || !data) return;
+    // same series with only a new last value (live tick): update in place, keep the user's zoom
+    const sig = `${data.length}|${data[0] && data[0][0]}|${extra.length}|${baseline}`;
+    if (s.sig === sig && s.main && data.length) { const [t, v] = data.at(-1); if (v != null && Number.isFinite(v)) { try { s.main.update({ time: Math.floor(t / 1000), value: v }); } catch {} } return; }
+    s.sig = sig;
     for (const x of s.all || []) { try { s.ch.removeSeries(x); } catch {} }
     s.all = [];
     const pts = []; for (const [t, v] of data) { const tt = Math.floor(t / 1000); if (v != null && Number.isFinite(v) && (!pts.length || tt > pts.at(-1).time)) pts.push({ time: tt, value: v }); }

@@ -42,8 +42,8 @@ export function GoldScreen() {
       <button class=${`iconbtn ${s.gold.alertsOn ? 'on' : ''}`} onClick=${() => setSheet('alerts')} aria-label="Alerts"><${Icon} n="bell" /></button></div>
 
     <div class="card hero" style="text-align:center">
-      <div class="label"><span class=${`livedot ${lv.price && !lv.err ? '' : 'off'}`}></span>${lv.err && !lv.price ? 'Offline: last known' : 'Live spot · zł per gram'}</div>
-      <div class="ticker">${p ? num(p) : '…'}</div>
+      <div class="label"><span class=${`livedot ${lv.price && !lv.err ? '' : 'off'}`}></span>${lv.err && !lv.price ? 'Offline: last known' : 'Live spot · per gram'}</div>
+      <div class="ticker">${p ? money(p) : '…'}</div>
       <div class="row" style="justify-content:center;gap:10px;font-size:13px">
         ${chg != null && html`<span class=${`mono ${chg >= 0 ? 'up' : 'down'}`}>${chg >= 0 ? '▲' : '▼'} ${num(Math.abs(p - lv.dayOpen))} (${pct(chg, 2)})</span><span class="hint">vs yesterday's NBP price</span>`}
       </div>
@@ -51,21 +51,22 @@ export function GoldScreen() {
       <div class="sep"></div>
       <div class="row between" style="font-size:13px">
         <span class="dim">Shop price estimate<div class="hint">spot + your ${num(premium * 100, 1)}% premium</div></span>
-        <span class="mono gold" style="font-weight:800;font-size:18px">${p ? num(p * (1 + premium)) + ' zł' : '…'}</span>
+        <span class="mono gold" style="font-weight:800;font-size:18px">${p ? money(p * (1 + premium)) : '…'}</span>
       </div>
     </div>
 
     <div class="tabs5"><${Seg} options=${[['today', 'Today'], ['drivers', 'Drivers'], ['events', 'Events'], ['history', 'History'], ['learn', 'Learn']]} value=${tab} onChange=${setTab} /></div>
 
     ${tab === 'today' && html`
+    <div class="card tap" onClick=${() => nav('asset/' + encodeURIComponent('@GC.1'))}><div class="row"><span class="tile-ic-lg"><${Icon} n="spark" size=${20} /></span><div class="grow"><b style="font-weight:600">Advisor signal and pro chart</b><div class="hint">Gold futures (COMEX): score, every reason, backtest, trade plan, candles</div></div><${Icon} n="chevron" size=${16} cls="ice" /></div></div>
     <div class="sect"><span class="h-title">Warnings</span><span class="hint">live</span></div>
     <${Signals} max=${4} />
     <div class="sect"><span class="h-title">Outlook</span><button class="more" onClick=${() => setTab('drivers')}>Why →</button></div>
     <${OutlookCard} price=${p} />
     <div class="card">
       <${Seg} options=${RANGES.map(([k]) => [k, k])} value=${range} onChange=${setRange} />
-      <div style="margin-top:10px"><${LineChart} pts=${series.pts} time=${series.time} color="#a87414" fmt=${(v) => num(v) + ' zł/g'} refLine=${g.avgMarket || null} /></div>
-      ${g.avgMarket ? html`<div class="hint"><span class="cyan">- - -</span> market price at your buys (${num(g.avgMarket)} zł) · <span class="up">●</span> low · <span class="down">●</span> high</div>` : html`<div class="hint"><span class="up">●</span> lowest · <span class="down">●</span> highest</div>`}
+      <div style="margin-top:10px"><${LineChart} pts=${series.pts} time=${series.time} color="#FFE36E" fmt=${(v) => money(v)} refLine=${g.avgMarket || null} /></div>
+      ${g.avgMarket ? html`<div class="hint"><span class="cyan">- - -</span> market price at your buys (${money(g.avgMarket)}) · <span class="up">●</span> low · <span class="down">●</span> high</div>` : html`<div class="hint"><span class="up">●</span> lowest · <span class="down">●</span> highest</div>`}
       ${st && html`<div class="stat3" style="margin-top:10px">
         <div><div class="l">Low</div><div class="v up">${num(st.lo[1])}</div><div class="d">${fmtT(st.lo[0], series.time)}</div></div>
         <div><div class="l">High</div><div class="v down">${num(st.hi[1])}</div><div class="d">${fmtT(st.hi[0], series.time)}</div></div>

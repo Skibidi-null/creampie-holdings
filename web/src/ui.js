@@ -4,6 +4,7 @@ import { useState, useRef, useMemo, useEffect } from 'preact/hooks';
 import { get } from './store.js';
 import { money, moneyIn, num, clamp, parseNum } from './util.js';
 import { Icon } from './icons.js';
+import { SeriesChart } from './chart.js';
 
 export const html = htm.bind(h);
 
@@ -131,58 +132,13 @@ export function SettingRow({ title, hint, children, onClick }) {
     <div class="grow"><div style="font-weight:600">${title}</div>${hint && html`<div class="hint">${hint}</div>`}</div>${children}</div>`;
 }
 
-// ---------- line chart with touch scrubbing ----------
-export function LineChart({ pts, color = '#1f6b57', height = 180, time = false, fmt = (v) => num(v), marks = true, refLine }) {
-  const [hover, setHover] = useState(null);
-  const ref = useRef();
-  const W = 340, H = height, P = 6;
-  const geo = useMemo(() => {
-    if (!pts || pts.length < 2) return null;
-    let lo = Infinity, hi = -Infinity, loI = 0, hiI = 0;
-    pts.forEach((p, i) => { if (p[1] < lo) { lo = p[1]; loI = i; } if (p[1] > hi) { hi = p[1]; hiI = i; } });
-    if (refLine) { lo = Math.min(lo, refLine); hi = Math.max(hi, refLine); }
-    const pad = (hi - lo) * 0.12 || 1;
-    const y0 = lo - pad, y1 = hi + pad;
-    const x0 = pts[0][0], x1 = pts[pts.length - 1][0];
-    const X = (t) => P + ((t - x0) / (x1 - x0 || 1)) * (W - 2 * P);
-    const Y = (v) => P + (1 - (v - y0) / (y1 - y0)) * (H - 2 * P);
-    // decimate for speed
-    const step = Math.max(1, Math.floor(pts.length / 400));
-    const ds = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
-    const d = ds.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
-    return { d, area: `${d}L${X(x1)},${H}L${X(x0)},${H}Z`, X, Y, lo: pts[loI], hi: pts[hiI] };
-  }, [pts, height, refLine]);
-  if (!geo) return html`<div class="empty" style=${{ height: H + 'px', display: 'grid', placeItems: 'center' }}>Loading…</div>`;
-  const id = 'g' + color.replace('#', '');
-  const onMove = (e) => {
-    const r = ref.current.getBoundingClientRect();
-    const cx = ((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width * W;
-    let best = 0, bd = Infinity;
-    for (let i = 0; i < pts.length; i++) { const dd = Math.abs(geo.X(pts[i][0]) - cx); if (dd < bd) { bd = dd; best = i; } }
-    setHover(pts[best]);
-  };
-  const lbl = (t) => { const d = new Date(t); return time ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); };
-  const last = pts[pts.length - 1];
-  return html`<div>
-    <div class="chart-tip">${hover ? html`<b>${fmt(hover[1])}</b> · ${lbl(hover[0])}` : html`<span class="mute">Touch the chart to explore</span>`}</div>
-    <svg ref=${ref} class="chart" viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" style=${{ height: H + 'px' }}
-      onTouchStart=${onMove} onTouchMove=${onMove} onMouseMove=${onMove} onTouchEnd=${() => setHover(null)} onMouseLeave=${() => setHover(null)}>
-      <defs>
-        <linearGradient id=${id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color=${color} stop-opacity=".18"/><stop offset="1" stop-color=${color} stop-opacity="0"/></linearGradient>
-        
-      </defs>
-      ${[0.25, 0.5, 0.75].map((f) => html`<line x1="0" x2=${W} y1=${H * f} y2=${H * f} stroke="rgba(128,128,128,.15)" />`)}
-      ${refLine && html`<line x1="0" x2=${W} y1=${geo.Y(refLine)} y2=${geo.Y(refLine)} stroke="#2f6fa3" stroke-dasharray="4 4" stroke-width="1" opacity=".7" vector-effect="non-scaling-stroke"/>`}
-      <path d=${geo.area} fill=${`url(#${id})`} />
-      <path d=${geo.d} fill="none" stroke=${color} stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
-      ${marks && html`<circle cx=${geo.X(geo.lo[0])} cy=${geo.Y(geo.lo[1])} r="4" fill="#1e8a55" /><circle cx=${geo.X(geo.hi[0])} cy=${geo.Y(geo.hi[1])} r="4" fill="#c2392f" />`}
-      <circle cx=${geo.X(last[0])} cy=${geo.Y(last[1])} r="4" fill=${color} />
-      ${hover && html`<line x1=${geo.X(hover[0])} x2=${geo.X(hover[0])} y1="0" y2=${H} stroke="currentColor" stroke-width="1" opacity=".4" vector-effect="non-scaling-stroke"/><circle cx=${geo.X(hover[0])} cy=${geo.Y(hover[1])} r="5" fill=${color} />`}
-    </svg>
-  </div>`;
+// ---------- line chart: interactive (pinch, pan, crosshair) on Lightweight Charts ----------
+export function LineChart({ pts, color = '#00D2FF', height = 200, fmt = (v) => num(v), refLine }) {
+  if (!pts || pts.length < 2) return html`<div class="lwc" style=${{ height: height + 'px' }}><div class="loading"><div class="shimmer"></div></div></div>`;
+  return html`<${SeriesChart} data=${pts} height=${height} fmt=${fmt} color=${color} baseline=${refLine || null} />`;
 }
 
-export const PALETTE = ['#1f6b57', '#2f6fa3', '#c8963e', '#b5523b', '#6b5b95', '#4f8a3c', '#a0596e', '#3e8e9e', '#8a7a52', '#9a9a92'];
+export const PALETTE = ['#00D2FF', '#FFE36E', '#7A5CFF', '#FF3CC8', '#3CFFB4', '#9DF6FF', '#FF8F5C', '#A794FF', '#5CF2FF', '#C9CBE0'];
 
 export function Donut({ data, size = 150, center }) {
   const total = data.reduce((s, d) => s + d.v, 0);
@@ -213,9 +169,9 @@ export function Bars({ rows, height = 140 }) {
       const x = i * slot + slot / 2;
       const ha = (r.a / max) * H, hb = (r.b / max) * H;
       return html`<g>
-        <rect x=${x - bw - 1} y=${H - ha} width=${bw} height=${ha} rx="3" fill="#1e8a55" opacity=".85"/>
-        <rect x=${x + 1} y=${H - hb} width=${bw} height=${hb} rx="3" fill="#b5523b" opacity=".85"/>
-        <text x=${x} y=${H + 13} text-anchor="middle" font-size="10" fill="#8d8c85">${r.label}</text>
+        <rect x=${x - bw - 1} y=${H - ha} width=${bw} height=${ha} rx="3" fill="#3CFFB4" opacity=".8"/>
+        <rect x=${x + 1} y=${H - hb} width=${bw} height=${hb} rx="3" fill="#FF5C8A" opacity=".8"/>
+        <text x=${x} y=${H + 13} text-anchor="middle" font-size="10" fill="#6E7190">${r.label}</text>
       </g>`;
     })}
   </svg>`;
@@ -230,8 +186,8 @@ export function SimpleBars({ rows, height = 120, fmt = (v) => v.toFixed(1) }) {
     ${rows.map((r, i) => {
       const hh = (Math.abs(r.v) / max) * (mid - 4);
       const x = i * slot + (slot - bw) / 2;
-      return html`<g><rect x=${x} y=${r.v >= 0 ? mid - hh : mid} width=${bw} height=${hh} rx="3" fill=${r.v < 0 ? '#1e8a55' : '#c2392f'} opacity=${r.hl ? 1 : 0.7}/>
-        <text x=${x + bw / 2} y=${H + 12} text-anchor="middle" font-size="10" fill="#8d8c85" font-weight=${r.hl ? 700 : 400}>${r.label}</text></g>`;
+      return html`<g><rect x=${x} y=${r.v >= 0 ? mid - hh : mid} width=${bw} height=${hh} rx="3" fill=${r.v < 0 ? '#3CFFB4' : '#FF5C8A'} opacity=${r.hl ? 1 : 0.7}/>
+        <text x=${x + bw / 2} y=${H + 12} text-anchor="middle" font-size="10" fill="#6E7190" font-weight=${r.hl ? 700 : 400}>${r.label}</text></g>`;
     })}
   </svg>`;
 }
