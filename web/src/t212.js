@@ -20,12 +20,21 @@ export const T212 = {
   get env() { return cfg.env || 'demo'; },
   get connected() { const c = cfg[this.env]; return !!(c && c.key && c.secret && c.ok); },
   creds(env = this.env) { return cfg[env] || null; },
-  get relay() { return cfg.relay || RELAY_URL || ''; },
+  get relay() { return normRelay(cfg.relay) || RELAY_URL || ''; },
   get native() { return !!(window.CPNative && window.CPNative.http); },
   get canConnect() { return this.native || !!this.relay; },
 };
 export function setEnv(env) { cfg = { ...cfg, env }; save(); }
-export function setRelay(url) { cfg = { ...cfg, relay: url.trim().replace(/\/+$/, '') }; save(); }
+// Accept the address however it was typed: missing https://, spaces, a trailing /t212/... or /api/... part, or a typo.
+// Anything that isn't a usable https address falls back to the built-in relay.
+export function normRelay(url) {
+  let u = String(url || '').trim().replace(/\s+/g, '');
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  u = (/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(u) ? u : u.replace(/^http:\/\//i, 'https://')).replace(/\/(t212|api)(\/.*)?$/i, '').replace(/\/+$/, '');
+  try { const x = new URL(u); return (x.hostname.includes('.') || x.hostname === 'localhost') ? x.origin : ''; } catch { return ''; }
+}
+export function setRelay(url) { cfg = { ...cfg, relay: normRelay(url) }; save(); }
 export function saveCreds(env, key, secret, ok) { cfg = { ...cfg, env, [env]: { key: key.trim(), secret: secret.trim(), ok: !!ok } }; save(); }
 export function forget(env) { const c = { ...cfg }; delete c[env]; cfg = c; save(); clearCache(); }
 export function useT212() { const [, s] = useState(0); useEffect(() => { const f = () => s((x) => x + 1); subs.add(f); return () => subs.delete(f); }, []); return T212; }
@@ -76,7 +85,16 @@ export async function call(method, path, body, env = T212.env, creds) {
   if (T212.native) res = await nativeCall(method, `https://${env}.trading212.com${path}`, auth, json);
   else if (T212.relay) {
     try {
-      const r = await fetch(`${T212.relay}/t212/${env}${path}`, { method, headers: { Authorization: auth, ...(json ? { 'Content-Type': 'application/json' } : {}) }, body: json, cache: 'no-store' });
+      const go = (base) => fetch(`${base}/t212/${env}${path}`, { method, headers: { Authorization: auth, ...(json ? { 'Content-Type': 'application/json' } : {}) }, body: json, cache: 'no-store' });
+      let r;
+      try { r = await go(T212.relay); } catch { r = null; }
+      // A saved address that can't be reached at all: fall back to the built-in relay and forget the bad one.
+      // (A 404 can be a real Trading 212 answer, e.g. an order that no longer exists, so it never triggers this.)
+      if (!r && RELAY_URL && T212.relay !== RELAY_URL) {
+        const r2 = await go(RELAY_URL).catch(() => null);
+        if (r2) { r = r2; cfg = { ...cfg, relay: '' }; save(); }
+      }
+      if (!r) throw new Error('net');
       res = { status: r.status, body: await r.text() };
     } catch { res = { status: 0, body: '' }; }
   } else throw new T212Error(-1, 'On iPhone, Trading 212 needs the relay set up first (see Connect screen).');
