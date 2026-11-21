@@ -103,3 +103,8 @@ Brief: notes/BRIEF-v2.md (incl. user answers + locked additions at the bottom).
 - S21 api35 emulator: host GPU crash (qemu segfault) ~45 s after the WebView app opens, even with blur effects removed; idle emulator is stable. Home screenshot taken before the crash looked right. Needs a check on a real phone.
 - Old WebView (Chrome 69) supported via polyfills; flex gap missing there (spacing tighter) but usable.
 - Known limits: earnings/insiders/13F come from the online job (macro.json, 6 h); calendar "actual" not in the free feed; UAE central bank rate has no free feed; dividend dates not in free data.
+## 21 Nov 11:15: Android 2.0.1 (versionCode 5) published (docs/android). Widgets reworked per review (1x1 two-line layout, fit-to-width text, empty states, min resize 70dp / 110x60). Setting changes now trigger an immediate one-time AlertWorker run. Card glow masked (soft on old WebView).
+### LEFT TO DO
+1. S21 api35 re-test: emulator crashed host-side (qemu segfault, "Failed to find ColorBuffer") ~45 s after the app opened, every time; retry with another -gpu mode or test on a real phone.
+2. Android alert firing not yet confirmed end to end: a Bitcoin "above 999999" alert exists on note8; edit it to a low price in the app (triggers the new immediate worker run) and screenshot the notification shade. Web in-app alerts and the online job were tested.
+3. Widgets on a real launcher (tested via a host test screen at 60..250 dp on note8 only).

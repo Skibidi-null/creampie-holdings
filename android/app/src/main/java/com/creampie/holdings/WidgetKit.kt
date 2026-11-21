@@ -75,38 +75,44 @@ object WidgetKit {
         val opts = mgr.getAppWidgetOptions(id)
         val wDp = max(opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 110), 40)
         val hDp = max(opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)), 40)
-        val tiny = wDp < 100 || hDp < 70
-        val short = hDp < 90
+        // size classes: cell = one column wide, short = one row high, tall = 3+ rows
+        val cell = wDp < 100
+        val short = hDp < 100
         val tall = hDp >= 150
         val wide = wDp >= 220
         val dens = ctx.resources.displayMetrics.density
         val cfg = Store.config(ctx); val w = cfg.optJSONObject("widget"); val priv = w?.optBoolean("privacy", false) == true
         val v = RemoteViews(ctx.packageName, R.layout.w_holo)
-        // reset
-        for (x in listOf(R.id.gauge, R.id.chart, R.id.rows, R.id.foot)) v.setViewVisibility(x, View.GONE)
-        v.setViewVisibility(R.id.mid, View.VISIBLE)
-        v.setTextViewText(R.id.corner, ""); v.setTextViewText(R.id.sub, ""); v.setTextColor(R.id.sub, MINT); v.setTextColor(R.id.big, WHITE)
-        v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 17f else if (wide && tall) 34f else 24f)
+        for (x in listOf(R.id.gauge, R.id.chart, R.id.rows, R.id.foot, R.id.sub)) v.setViewVisibility(x, View.GONE)
+        v.setViewVisibility(R.id.mid, View.VISIBLE); v.setViewVisibility(R.id.head, View.VISIBLE)
+        v.setTextViewText(R.id.corner, ""); v.setTextColor(R.id.sub, MINT); v.setTextColor(R.id.big, WHITE)
+        val padH = ((if (cell) 6 else 13) * dens).toInt(); val padV = ((if (short) 6 else 12) * dens).toInt()
+        v.setViewPadding(R.id.pad, padH, padV, padH, padV)
+        v.setTextViewTextSize(R.id.label, TypedValue.COMPLEX_UNIT_SP, if (short || cell) 8.5f else 9.5f)
+        v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, 10.5f)
+        val inner = wDp - (if (cell) 16 else 26)
+        // big text sized to fit the width (no ellipsis)
+        fun big(t: String, maxSp: Float, color: Int = WHITE) {
+            val fit = (inner / (max(t.length, 3) * 0.64f)).coerceIn(9f, maxSp)
+            v.setTextViewText(R.id.big, t); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, fit); v.setTextColor(R.id.big, color)
+        }
+        fun sub(t: String, color: Int = MINT) { if (t.isEmpty() || short && hDp < 80) return; v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, t); v.setTextColor(R.id.sub, color) }
+        val bigMax = if (short) 17f else if (wide && tall) 34f else 24f
         val chartPx = { ww: Int, hh: Int -> Pair(min((ww * dens).toInt(), 900), min((hh * dens).toInt(), 400)) }
         var route = "home"
-        // compact spacing for one-row and 1x1 widgets
-        val padH = ((if (wDp < 90) 9 else 13) * dens).toInt(); val padV = ((if (short) 7 else 13) * dens).toInt()
-        v.setViewPadding(R.id.pad, padH, padV, padH, padV)
-        v.setTextViewTextSize(R.id.label, TypedValue.COMPLEX_UNIT_SP, if (short) 8.5f else 9.5f)
-        v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, if (short) 9.5f else 11f)
         when (kind) {
             "nw" -> {
                 route = "networth"
                 v.setTextViewText(R.id.label, "NET WORTH")
-                v.setTextViewText(R.id.big, if (priv) "•••••" else w?.optString("nwTxt", "…") ?: "Open the app once")
+                big(if (priv) "•••••" else w?.optString("nwTxt")?.takeIf { it.isNotEmpty() } ?: "Open the app", bigMax)
                 val p = w?.optDouble("nwPct", Double.NaN) ?: Double.NaN
-                if (!p.isNaN()) { v.setTextViewText(R.id.sub, (if (p >= 0) "▲ " else "▼ ") + pct(p) + " today"); v.setTextColor(R.id.sub, if (p >= 0) MINT else PINK) }
+                if (!p.isNaN()) sub((if (p >= 0) "▲ " else "▼ ") + pct(p) + " today", if (p >= 0) MINT else PINK)
                 val sp = w?.optJSONArray("nwSpark")
-                if (!tiny && sp != null && sp.length() > 1 && hDp >= 100) {
+                if (!short && sp != null && sp.length() > 1) {
                     val vals = DoubleArray(sp.length()) { sp.optDouble(it) }
-                    val (cw, ch) = chartPx(wDp - 26, max(30, hDp - 90)); v.setImageViewBitmap(R.id.chart, spark(vals, cw, ch, true, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE)
-                }
-                if (!tiny) v.setTextViewText(R.id.corner, w?.optString("cur", "") ?: "")
+                    val (cw, ch) = chartPx(inner, max(30, hDp - 90)); v.setImageViewBitmap(R.id.chart, spark(vals, cw, ch, true, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE)
+                } else if (!short) sub("History builds up day by day", DIM)
+                if (wide) v.setTextViewText(R.id.corner, w?.optString("cur", "") ?: "")
             }
             "signal" -> {
                 val calls = w?.optJSONArray("calls") ?: JSONArray()
@@ -114,39 +120,52 @@ object WidgetKit {
                 var c: JSONObject? = null
                 for (i in 0 until calls.length()) { val x = calls.getJSONObject(i); if (pick == null || x.optString("sym") == pick) { c = x; break } }
                 route = if (c != null) "asset/" + java.net.URLEncoder.encode(c.optString("sym"), "UTF-8") else "advisor"
-                v.setTextViewText(R.id.label, "SIGNAL")
                 val score = c?.optDouble("score", Double.NaN) ?: Double.NaN
-                val gs = if (tiny) 44 else if (tall) 92 else 64
-                v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
-                v.setTextViewText(R.id.big, c?.optString("name") ?: "Open the app")
-                v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 12f else 16f)
                 val verdict = c?.optString("v") ?: ""
-                v.setTextViewText(R.id.sub, verdict.uppercase()); v.setTextColor(R.id.sub, if (verdict.contains("Buy")) MINT else if (verdict.contains("Sell")) PINK else GOLD)
+                val vc = if (verdict.contains("Buy")) MINT else if (verdict.contains("Sell")) PINK else GOLD
+                if (cell) {
+                    // one column: name on top, the gauge (with the score) fills the rest
+                    v.setTextViewText(R.id.label, (c?.optString("name") ?: "SIGNAL").uppercase())
+                    val gs = max(36, min(wDp - 16, hDp - 30))
+                    v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
+                    v.setTextViewText(R.id.big, ""); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, 1f)
+                } else {
+                    v.setTextViewText(R.id.label, "SIGNAL")
+                    val gs = if (short) max(36, hDp - 26) else if (tall) 92 else 64
+                    v.setImageViewBitmap(R.id.gauge, gauge(if (score.isNaN()) null else score, (gs * dens).toInt(), dens)); v.setViewVisibility(R.id.gauge, View.VISIBLE)
+                    val nm = c?.optString("name") ?: "Open app"
+                    val room = inner - gs - 10
+                    v.setTextViewText(R.id.big, nm); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, (room / (max(nm.length, 4) * 0.6f)).coerceIn(10f, 16f)); v.setTextColor(R.id.big, WHITE)
+                    if (verdict.isNotEmpty()) { v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, verdict.uppercase()); v.setTextColor(R.id.sub, vc) }
+                }
             }
             "watch" -> {
                 route = "markets"
-                v.setTextViewText(R.id.label, "WATCHLIST"); v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
+                v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
+                if (short) v.setViewVisibility(R.id.head, View.GONE) else v.setTextViewText(R.id.label, "WATCHLIST")
                 val arr = w?.optJSONArray("watch") ?: JSONArray()
-                val n = min(arr.length(), max(1, ((hDp - 36) / 22)).coerceAtMost(6))
+                val rowH = if (short) 17 else 22
+                val n = min(arr.length(), ((hDp - (if (short) 10 else 34)) / rowH).coerceIn(1, 6))
                 for (i in 0 until 6) {
                     val row = rid("row", i); if (i >= n) { v.setViewVisibility(row, View.GONE); continue }
                     val x = arr.getJSONObject(i); val (last, pc) = quote(ctx, w, x.optString("sym"))
                     v.setViewVisibility(row, View.VISIBLE)
-                    v.setTextViewText(rid("r", i, "n"), x.optString("name"))
-                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "-" else if (wide && last != null) "${price(last)}  ${pct(pc)}" else pct(pc))
+                    v.setViewPadding(row, 0, ((if (short) 1 else 3) * dens).toInt(), 0, ((if (short) 1 else 3) * dens).toInt())
+                    v.setTextViewText(rid("r", i, "n"), if (cell) nice(x.optString("sym"), x.optString("name")) else x.optString("name"))
+                    v.setTextViewText(rid("r", i, "v"), if (pc == null) "-" else if (wide && last != null) "${price(last)}  ${pct(pc)}" else pct1(pc))
                     v.setTextColor(rid("r", i, "v"), if ((pc ?: 0.0) >= 0) MINT else PINK)
+                    for (t in listOf(rid("r", i, "n"), rid("r", i, "v"))) v.setTextViewTextSize(t, TypedValue.COMPLEX_UNIT_SP, if (cell) 10f else if (short) 11f else 12f)
                 }
                 if (arr.length() == 0) { v.setViewVisibility(R.id.row0, View.VISIBLE); v.setTextViewText(R.id.r0n, "Open the app to load your list"); v.setTextViewText(R.id.r0v, "") }
             }
             "risk" -> {
                 route = "world"
                 val r = w?.optJSONObject("risk")
-                v.setTextViewText(R.id.label, "RISK")
+                v.setTextViewText(R.id.label, if (wide) "RISK ON / OFF" else "RISK")
                 val sc = r?.optInt("score", -1) ?: -1
-                v.setTextViewText(R.id.big, if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIXED")
-                v.setTextColor(R.id.big, if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD)
-                v.setTextViewText(R.id.sub, if (sc < 0) "open the app" else if (tiny) "$sc/100" else "${r?.optString("label")} · $sc/100"); v.setTextColor(R.id.sub, DIM)
-                if (!tiny && sc >= 0) { val (cw, ch) = chartPx(wDp - 26, 16); v.setImageViewBitmap(R.id.chart, meter(sc / 100.0, cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
+                big(if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIXED", if (cell) 22f else bigMax, if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD)
+                if (sc < 0) sub("Open the app once", DIM) else if (!cell) sub("${r?.optString("label")} · $sc/100", DIM) else sub("$sc/100", DIM)
+                if (!short && sc >= 0) { val (cw, ch) = chartPx(inner, 16); v.setImageViewBitmap(R.id.chart, meter(sc / 100.0, cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
             }
             "ticker" -> {
                 val sym = Store.prefs(ctx).getString("w_$id", null) ?: (w?.optJSONArray("watch")?.optJSONObject(0)?.optString("sym") ?: "BTC-USD")
@@ -154,54 +173,78 @@ object WidgetKit {
                 var name = sym
                 val arr = w?.optJSONArray("watch") ?: JSONArray(); for (i in 0 until arr.length()) if (arr.getJSONObject(i).optString("sym") == sym) name = arr.getJSONObject(i).optString("name")
                 val (last, pc) = quote(ctx, w, sym)
-                v.setTextViewText(R.id.label, (if (tiny) short(sym) else name).uppercase())
-                v.setTextViewText(R.id.big, if (pc == null) "-" else pct(pc)); v.setTextColor(R.id.big, if ((pc ?: 0.0) >= 0) MINT else PINK)
-                v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 16f else if (wDp < 150) 19f else 24f)
-                v.setTextViewText(R.id.sub, if (last == null) "" else price(last)); v.setTextColor(R.id.sub, DIM)
+                v.setTextViewText(R.id.label, (if (cell || name.length > 14) nice(sym, name) else name).uppercase())
+                big(if (pc == null) "-" else if (cell) pct1(pc) else pct(pc), if (cell) 20f else bigMax, if ((pc ?: 0.0) >= 0) MINT else PINK)
+                if (last != null && (!short || !cell)) { v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, price(last)); v.setTextColor(R.id.sub, DIM) }
+                if (pc == null && last == null) sub("Waiting for prices", DIM)
             }
             "markets" -> {
                 route = "world/now"
-                v.setTextViewText(R.id.label, "MARKETS NOW"); v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
-                val list = Sessions.status(wDp < 170)
-                val n = if (hDp < 70) 1 else if (tiny) 2 else min(list.size, max(2, (hDp - 36) / 20).coerceAtMost(6))
-                for (i in 0 until 6) {
-                    val row = rid("row", i); if (i >= n) { v.setViewVisibility(row, View.GONE); continue }
-                    val (nm, open, txt) = list[i]; v.setViewVisibility(row, View.VISIBLE)
-                    v.setTextViewText(rid("r", i, "n"), nm); v.setTextViewText(rid("r", i, "v"), txt); v.setTextColor(rid("r", i, "v"), if (open) MINT else MUTE)
+                val list = Sessions.status(cell || !wide)
+                v.setTextViewText(R.id.label, if (wide) "MARKETS NOW" else "MARKETS")
+                if (short || cell) {
+                    // one line: an open market, or the next one to open
+                    val open = list.firstOrNull { it.second }
+                    val next = Sessions.next()
+                    big(if (open != null) "${open.first} open" else "All closed", if (cell) 15f else bigMax, if (open != null) MINT else DIM)
+                    if (open == null && next != null) sub("${next.first} in ${next.second}", DIM) else if (open != null) sub("${list.count { it.second }} of ${list.size} open", DIM)
+                } else {
+                    v.setViewVisibility(R.id.mid, View.GONE); v.setViewVisibility(R.id.rows, View.VISIBLE)
+                    val n = min(list.size, ((hDp - 40) / 24).coerceIn(2, 6))
+                    for (i in 0 until 6) {
+                        val row = rid("row", i); if (i >= n) { v.setViewVisibility(row, View.GONE); continue }
+                        val (nm, isOpen, txt) = list[i]; v.setViewVisibility(row, View.VISIBLE)
+                        v.setTextViewText(rid("r", i, "n"), nm); v.setTextViewText(rid("r", i, "v"), txt); v.setTextColor(rid("r", i, "v"), if (isOpen) MINT else MUTE)
+                    }
                 }
             }
             "budget" -> {
                 route = "budget"
                 val b = w?.optJSONObject("budget")
                 if (b == null) {
-                    v.setTextViewText(R.id.label, "SPENT THIS MONTH")
-                    v.setTextViewText(R.id.big, if (priv) "••••" else Widget.zl(w?.optDouble("month", 0.0) ?: 0.0))
-                    v.setTextViewText(R.id.sub, "Set a monthly limit for a daily one"); v.setTextColor(R.id.sub, DIM)
+                    v.setTextViewText(R.id.label, if (wide) "SPENT THIS MONTH" else "THIS MONTH")
+                    big(if (priv) "••••" else Widget.zl(w?.optDouble("month", 0.0) ?: 0.0), bigMax)
+                    sub("Tap to set a monthly limit", DIM)
                 } else {
-                    v.setTextViewText(R.id.label, "BUDGET · ${java.time.LocalDate.now().month.getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH).uppercase()}")
+                    v.setTextViewText(R.id.label, if (cell || !wide) "BUDGET" else "BUDGET · ${java.time.LocalDate.now().month.getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH).uppercase()}")
                     val over = b.optDouble("monthLeft") < 0
-                    v.setTextViewText(R.id.big, if (priv) "••••" else "${b.optString("leftTxt")} ${if (over) "over" else "left"} · ${b.optInt("daysLeft")} days")
-                    v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 13f else 17f)
-                    if (!priv) v.setTextViewText(R.id.sub, (if (b.optBoolean("over")) "Over today by " else "Today you can spend ") + b.optString("todayTxt"))
-                    v.setTextColor(R.id.sub, if (b.optBoolean("over")) PINK else MINT)
-                    if (!tiny) { val (cw, ch) = chartPx(wDp - 26, 8); v.setImageViewBitmap(R.id.chart, bar(b.optDouble("used", 0.0), cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
+                    big(if (priv) "••••" else "${b.optString("leftTxt")} ${if (over) "over" else "left"}", bigMax, if (over) PINK else WHITE)
+                    if (!priv) sub("${b.optInt("daysLeft")} days · " + (if (b.optBoolean("over")) "over today by " else "today ") + b.optString("todayTxt"), if (b.optBoolean("over")) PINK else MINT)
+                    if (!short) { val (cw, ch) = chartPx(inner, 8); v.setImageViewBitmap(R.id.chart, bar(b.optDouble("used", 0.0), cw, ch, dens)); v.setViewVisibility(R.id.chart, View.VISIBLE) }
                 }
             }
             "alert" -> {
                 route = "alerts"
                 val n = w?.optJSONObject("next")
                 v.setTextViewText(R.id.label, "NEXT ALERT")
-                v.setTextViewText(R.id.big, n?.optString("text") ?: "No price alerts set")
-                v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (tiny) 12f else 15f)
-                v.setTextViewText(R.id.sub, if (n != null) String.format(Locale.US, "%.1f%% away", n.optDouble("dist")) else "Tap to add one"); v.setTextColor(R.id.sub, GOLD)
+                if (n == null) { big("No alerts yet", if (short) 15f else 18f, DIM); sub("Tap to add one", GOLD) }
+                else { big(String.format(Locale.US, if (n.optDouble("dist") >= 100) "%.0f%% away" else "%.1f%% away", n.optDouble("dist")), bigMax, GOLD); sub(n.optString("text"), DIM) }
             }
         }
-        if (short) v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, if (wDp < 90) 13f else 15f)
-        if (hDp < 62 && kind != "ticker") v.setViewVisibility(R.id.sub, View.GONE) else v.setViewVisibility(R.id.sub, View.VISIBLE)
-        if (tall && kind != "watch" && kind != "markets") { v.setViewVisibility(R.id.foot, View.VISIBLE); v.setTextViewText(R.id.foot, "Creampie Holdings") }
+        if (cell && short && kind != "signal") {
+            val top: String; val value: String; var col = WHITE
+            when (kind) {
+                "ticker" -> { val sym = Store.prefs(ctx).getString("w_$id", null) ?: (w?.optJSONArray("watch")?.optJSONObject(0)?.optString("sym") ?: "BTC-USD"); var nm = sym
+                    (w?.optJSONArray("watch") ?: JSONArray()).let { a -> for (i in 0 until a.length()) if (a.getJSONObject(i).optString("sym") == sym) nm = a.getJSONObject(i).optString("name") }
+                    val pc = quote(ctx, w, sym).second; top = nice(sym, nm); value = if (pc == null) "-" else pct1(pc); col = if ((pc ?: 0.0) >= 0) MINT else PINK }
+                "risk" -> { val sc = w?.optJSONObject("risk")?.optInt("score", -1) ?: -1; top = "RISK"; value = if (sc < 0) "-" else if (sc >= 55) "ON" else if (sc <= 45) "OFF" else "MIX"; col = if (sc >= 55) MINT else if (sc in 0..45) PINK else GOLD }
+                "markets" -> { val n = Sessions.status(true).count { it.second }; top = "MARKETS"; value = if (n == 0) "Closed" else "$n open"; col = if (n > 0) MINT else DIM }
+                "nw" -> { top = "NET"; value = if (priv) "\u2022\u2022\u2022" else w?.optString("nwTxt") ?: "-" }
+                else -> { top = kind.uppercase(); value = "-" }
+            }
+            v.setViewVisibility(R.id.head, View.GONE); v.setViewVisibility(R.id.chart, View.GONE)
+            v.setTextViewText(R.id.big, top); v.setTextColor(R.id.big, DIM); v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, 9.5f)
+            v.setViewVisibility(R.id.sub, View.VISIBLE); v.setTextViewText(R.id.sub, value); v.setTextColor(R.id.sub, col)
+            v.setTextViewTextSize(R.id.sub, TypedValue.COMPLEX_UNIT_SP, (inner / (max(value.length, 3) * 0.72f)).coerceIn(9f, 18f))
+        }
+        if (cell && short && kind == "signal") { v.setViewVisibility(R.id.head, View.GONE); v.setImageViewBitmap(R.id.gauge, gauge((w?.optJSONArray("calls")?.optJSONObject(0)?.optDouble("score", Double.NaN) ?: Double.NaN).let { if (it.isNaN()) null else it }, ((hDp - 14) * dens).toInt(), dens)) }
+        if (tall && kind != "watch" && kind != "markets" && !cell) { v.setViewVisibility(R.id.foot, View.VISIBLE); v.setTextViewText(R.id.foot, "Creampie Holdings") }
         v.setOnClickPendingIntent(R.id.root, open(ctx, route, 9100 + id))
         mgr.updateAppWidget(id, v)
     }
+    private val NICE = mapOf("@GC.1" to "Gold", "@SI.1" to "Silver", "@CL.1" to "Oil", "BTC-USD" to "BTC", "ETH-USD" to "ETH", ".SPX" to "S&P", ".IXIC" to "Nasdaq", "EURPLN=" to "EURPLN", "PLN=" to "USDPLN")
+    private fun nice(sym: String, name: String) = NICE[sym] ?: if (name.length in 1..7) name else short(sym)
+    fun pct1(v: Double) = String.format(Locale.US, "%s%.1f%%", if (v >= 0) "+" else "−", abs(v))
     private fun short(sym: String) = sym.removePrefix(".").removePrefix("@").removeSuffix("-USD").removeSuffix("=").removeSuffix("-GB").removeSuffix(".1").take(6)
     private fun rid(a: String, i: Int, b: String = "") = when ("$a$i$b") {
         "row0" -> R.id.row0; "row1" -> R.id.row1; "row2" -> R.id.row2; "row3" -> R.id.row3; "row4" -> R.id.row4; "row5" -> R.id.row5
@@ -271,5 +314,8 @@ object Sessions {
             Triple(e.name, false, if (short) fmt(add) else "opens ${fmt(add)}")
         }
     }
+    /** the exchange that opens next and how long until then */
+    fun next(): Pair<String, String>? = status(true).filter { !it.second }.minByOrNull { mins(it.third) }?.let { it.first to it.third }
+    private fun mins(t: String): Int { var m = 0; Regex("(\\d+)([dhm])").findAll(t).forEach { val n = it.groupValues[1].toInt(); m += when (it.groupValues[2]) { "d" -> n * 1440; "h" -> n * 60; else -> n } }; return m }
     private fun fmt(m: Int) = if (m < 60) "${m}m" else if (m < 1440) "${m / 60}h ${m % 60}m" else "${m / 1440}d ${m % 1440 / 60}h"
 }

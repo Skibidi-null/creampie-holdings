@@ -22,6 +22,10 @@ class Bridge(private val act: MainActivity) {
     fun setConfig(json: String) {
         Store.prefs(ctx).edit().putString("config", json).apply()
         Widget.refresh(ctx)
+        // check alerts and refresh widget prices right away (debounced), not only every 15 minutes
+        androidx.work.WorkManager.getInstance(ctx).enqueueUniqueWork("alerts-now", androidx.work.ExistingWorkPolicy.REPLACE,
+            androidx.work.OneTimeWorkRequestBuilder<AlertWorker>().setInitialDelay(8, java.util.concurrent.TimeUnit.SECONDS)
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build()).build())
     }
 
     @JavascriptInterface fun appVersion(): String = Updater.versionName(ctx) + " (" + Updater.versionCode(ctx) + ")"
