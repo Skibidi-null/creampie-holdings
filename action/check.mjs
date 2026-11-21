@@ -8,10 +8,13 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 const webpush = createRequire(import.meta.url)('web-push');
 import { computeSignals, parseQuotes, QUOTE_URL, SYMS } from '../web/src/signals.js';
+import { prep, techScoreAt } from '../web/src/score.js';
+import { refreshMacro } from './macro.mjs';
 
 const { VAPID_PUBLIC, VAPID_PRIVATE, CFG_PRIVATE, TOPIC } = process.env;
 const STATE = process.env.STATE_FILE || 'state/state.json';
 const NEWS = process.env.NEWS_FILE || 'docs/news.json';
+const MACRO = process.env.MACRO_FILE || NEWS.replace(/news\.json$/, 'macro.json');
 const APP_URL = 'https://skibidi-null.github.io/creampie-holdings/';
 const OZ = 31.1034768;
 const now = Date.now();
@@ -147,7 +150,7 @@ async function assetPrice(sym) {
 function local(tz) {
   const f = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const p = Object.fromEntries(f.formatToParts(new Date(now)).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour), min: Number(p.minute) };
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour), min: Number(p.minute), weekday: new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay() };
 }
 function daysUntilDay(dateStr, day) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -182,6 +185,32 @@ if (newsAge > 55 * 60e3 || process.env.FORCE_NEWS) {
 news ||= newsFile;
 
 // ---------- calendar + early warnings (every run; file only changes when they change) ----------
+// daily candles for % move and signal alerts (cached per run)
+const barCache = new Map();
+async function dailyBars(sym) {
+  if (barCache.has(sym)) return barCache.get(sym);
+  let out = [];
+  try {
+    if (/^[A-Z0-9]+-USD$/.test(sym)) {
+      const end = Date.now(); const parts = [];
+      for (let k = 0; k < 2; k++) { const e = end - k * 300 * 864e5, b = e - 300 * 864e5; parts.push(...(await (await fetch(`https://api.exchange.coinbase.com/products/${sym}/candles?granularity=86400&start=${new Date(b).toISOString()}&end=${new Date(e).toISOString()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } })).json())); }
+      const m = new Map(); for (const x of parts) if (Array.isArray(x)) m.set(x[0], { time: x[0], low: x[1], high: x[2], open: x[3], close: x[4], volume: x[5] });
+      out = [...m.values()].sort((a, b) => a.time - b.time);
+    } else {
+      const ymd = (d) => d.toISOString().slice(0, 19).replace(/[-:T]/g, '');
+      const j = await (await fetch(`https://ts-api.cnbc.com/harmony/app/bars/${encodeURIComponent(sym)}/1D/${ymd(new Date(Date.now() - 600 * 864e5))}/${ymd(new Date(Date.now() + 864e5))}/adjusted/EST5EDT.json`, { headers: { 'User-Agent': 'Mozilla/5.0' } })).json();
+      out = ((j.barData && j.barData.priceBars) || []).map((b) => ({ time: Math.floor(b.tradeTimeinMills / 1000), open: +b.open || +b.close, high: +b.high || +b.close, low: +b.low || +b.close, close: +b.close, volume: +b.volume || 0 })).filter((b) => Number.isFinite(b.close));
+    }
+  } catch (e) { log('bars failed', sym, e.message); }
+  barCache.set(sym, out); return out;
+}
+function techScore(bars, live) {
+  if (!bars || bars.length < 230) return null;
+  const B = live ? [...bars.slice(0, -1), { ...bars.at(-1), close: live }] : bars;
+  const sc = techScoreAt(prep(B), B.length - 1); return sc == null ? null : Math.round(sc);
+}
+const inQuiet = (q, hour) => q && q.on && (q.from > q.to ? hour >= q.from || hour < q.to : hour >= q.from && hour < q.to);
+
 let quotes = {};
 try { quotes = parseQuotes(await (await fetch(QUOTE_URL(Object.values(SYMS)), { headers: { 'User-Agent': 'Mozilla/5.0' } })).json()); log('quotes', Object.keys(quotes).length); } catch (e) { log('quotes error', e.message); }
 let cal = (news && news.cal) || (newsFile && newsFile.cal) || [];
@@ -255,21 +284,46 @@ for (const [id, dev] of Object.entries(state.devices)) {
     for (const x of (L.hour >= 7 && L.hour < 23 ? fresh.slice(0, 1) : fresh)) f.sig.push(x.id);
     f.sig = f.sig.slice(-100);
   }
-  // watchlist price alerts (stocks via CNBC, crypto via Coinbase)
-  const mk = c.markets || {};
-  if (mk.on !== false && Array.isArray(mk.alerts) && mk.alerts.length) {
-    f.wa ||= {};
-    for (const al of mk.alerts) {
-      const px = await assetPrice(al.sym);
-      if (px == null) continue;
-      const k = al.sym; const st = (f.wa[k] ||= {});
-      const fmt = (v) => (v >= 1 ? v.toFixed(2) : v.toPrecision(4));
-      if (al.above && px >= al.above && !st.a) { sends.push({ title: `${al.name} is above ${fmt(al.above)}`, body: `Now ${fmt(px)}. Your price alert.`, url: APP_URL + '#/asset/' + encodeURIComponent(al.sym), tag: 'pa-' + k }); st.a = 1; }
-      if (al.above && px < al.above * 0.995) st.a = 0;
-      if (al.below && px <= al.below && !st.b) { sends.push({ title: `${al.name} dropped below ${fmt(al.below)}`, body: `Now ${fmt(px)}. Your price alert.`, url: APP_URL + '#/asset/' + encodeURIComponent(al.sym), tag: 'pb-' + k }); st.b = 1; }
-      if (al.below && px > al.below * 1.005) st.b = 0;
+  // price and signal alerts v2 (stocks via CNBC, crypto via Coinbase)
+  const quiet = inQuiet(c.quiet, L.hour);
+  if (Array.isArray(c.alerts) && c.alerts.length) {
+    f.al ||= {};
+    for (const al of c.alerts) {
+      const st = (f.al[al.id] ||= {});
+      const fmt = (v) => (v >= 1 ? (+v).toFixed(2) : (+v).toPrecision(4));
+      const url = APP_URL + '#/asset/' + encodeURIComponent(al.sym);
+      const push = (title, body) => { if (quiet && !al.urgent) { st.quietSkip = now; return; } sends.push({ title, body, url, tag: 'al-' + al.id }); };
+      const px = await assetPrice(al.sym); if (px == null) continue;
+      let side = null, title = '', body = `Now ${fmt(px)}. Your alert.`;
+      if (al.kind === 'above') { side = px >= al.a ? 1 : px < al.a * 0.997 ? 0 : st.s; title = `${al.name} is above ${fmt(al.a)}`; }
+      else if (al.kind === 'below') { side = px <= al.a ? 1 : px > al.a * 1.003 ? 0 : st.s; title = `${al.name} fell below ${fmt(al.a)}`; }
+      else if (al.kind === 'enter' || al.kind === 'leave') { const lo = Math.min(al.a, al.b), hi = Math.max(al.a, al.b); const inside = px >= lo && px <= hi; side = al.kind === 'enter' ? (inside ? 1 : 0) : inside ? 0 : 1; title = al.kind === 'enter' ? `${al.name} entered ${fmt(lo)} to ${fmt(hi)}` : `${al.name} left ${fmt(lo)} to ${fmt(hi)}`; }
+      else if (al.kind === 'move') { const b = await dailyBars(al.sym); if (b.length < (al.days || 1) + 1) continue; const ref = b[b.length - 1 - (al.days || 1)].close; const ch = ((px - ref) / ref) * 100; const want = Math.abs(al.pct || 5); side = (al.dir === 'down' ? ch <= -want : al.dir === 'up' ? ch >= want : Math.abs(ch) >= want) ? 1 : 0; title = `${al.name} ${ch >= 0 ? 'up' : 'down'} ${Math.abs(ch).toFixed(1)}% in ${al.days === 1 ? 'a day' : al.days + ' days'}`; }
+      else if (al.kind === 'score') { const sc = techScore(await dailyBars(al.sym), px); if (sc == null) continue; const sty = c.style || { buy: 60, sell: 40 }; const v = sc >= sty.buy ? 'buy' : sc <= sty.sell ? 'sell' : 'hold'; side = al.dir === 'any' ? v : (al.dir === 'sell' ? v === 'sell' : v === 'buy') ? 1 : 0; title = `${al.name}: technical signals now say ${v === 'buy' ? 'Buy' : v === 'sell' ? 'Sell' : 'Hold'}`; body = `Technical score ${sc}/100. Open the app for the full advisor reasons.`; if (al.dir === 'any') { if (st.s !== undefined && st.s !== side) push(title, body); st.s = side; continue; } }
+      else continue;
+      if (side === 1 && st.s === 0 && (!al.once || !st.done)) { push(title, body); if (al.once) st.done = 1; }
+      st.s = side;
     }
   }
+  // Sunday summary (Sunday 18:00-19:00 local)
+  if (c.sunday && L.weekday === 0 && L.hour === 18 && f.sunday !== L.date) {
+    f.sunday = L.date;
+    const mv = (sym, nm) => { const q = quotes[sym]; return q && q.pct != null ? `${nm} ${q.pct >= 0 ? '+' : ''}${q.pct.toFixed(1)}%` : null; };
+    let spxW = null; try { const b = await dailyBars('.SPX'); if (b.length > 6) spxW = ((b.at(-1).close / b.at(-6).close) - 1) * 100; } catch {}
+    let goldW = null; try { const b = await dailyBars('@GC.1'); if (b.length > 6) goldW = ((b.at(-1).close / b.at(-6).close) - 1) * 100; } catch {}
+    const nextEv = (cal || []).filter((e) => e.impact === 'High' && Date.parse(e.date) > now && Date.parse(e.date) < now + 7 * 864e5).slice(0, 3).map((e) => e.title);
+    const parts = [
+      c.sunday.nwPct != null ? `Your net worth ${c.sunday.nwPct >= 0 ? '+' : ''}${c.sunday.nwPct}% this week.` : null,
+      [spxW != null ? `S&P 500 ${spxW >= 0 ? '+' : ''}${spxW.toFixed(1)}%` : null, goldW != null ? `gold ${goldW >= 0 ? '+' : ''}${goldW.toFixed(1)}%` : null].filter(Boolean).join(', ') + (spxW != null || goldW != null ? ' this week.' : ''),
+      c.sunday.calls && c.sunday.calls.length ? `Advisor: ${c.sunday.calls.join(', ')}.` : null,
+      nextEv.length ? `Next week: ${nextEv.join(', ')}.` : null,
+    ].filter(Boolean);
+    if (parts.length) sends.push({ title: 'Your Sunday summary', body: parts.join(' '), url: APP_URL + '#/world/brief', tag: 'sunday' });
+  }
+  // DCA payday reminder (09:00-10:00 local on the chosen day)
+  if (c.dca && L.hour === 9 && +L.date.slice(8) === c.dca.day && f.dca !== L.date) { f.dca = L.date; sends.push({ title: 'DCA day', body: `Time for your monthly investment${c.dca.amount ? ` of ${c.dca.amount}` : ''}. Open the app to buy.`, url: APP_URL + '#/dca', tag: 'dca' }); }
+  // weekly backup reminder (Saturday 11:00)
+  if (c.backup && L.weekday === 6 && L.hour === 11 && f.bk !== L.date && now - (c.backup.last || 0) > 7 * 864e5) { f.bk = L.date; sends.push({ title: 'Time for a backup', body: 'Your last encrypted backup is more than a week old.', url: APP_URL + '#/backup', tag: 'backup' }); }
   const card = c.card || {};
   if (card.on && card.dueDay && card.owed > 0 && L.hour >= 9 && L.hour < 21) {
     const { days, due } = daysUntilDay(L.date, card.dueDay);
@@ -283,6 +337,7 @@ for (const [id, dev] of Object.entries(state.devices)) {
     if (c.lastEntry !== L.date) sends.push({ title: 'Daily reminder', body: 'Add today\'s spending before you forget.', url: APP_URL + '#/add', tag: 'night' });
     f.night = L.date;
   }
+  if (inQuiet(c.quiet, L.hour)) for (let i = sends.length - 1; i >= 0; i--) if (!/^(al-|card)/.test(sends[i].tag || '')) sends.splice(i, 1);
   for (const msg of sends) {
     try { await webpush.sendNotification(dev.sub, JSON.stringify(msg), { TTL: 3600, urgency: 'high' }); log('push', id, msg.tag); }
     catch (e) {
@@ -293,6 +348,8 @@ for (const [id, dev] of Object.entries(state.devices)) {
   // forget devices silent for 60 days
   if (state.devices[id] && now - dev.at > 60 * 864e5) delete state.devices[id];
 }
+
+try { await refreshMacro(MACRO, now); } catch (e) { log('macro error', e.message); }
 
 fs.mkdirSync(STATE.split('/').slice(0, -1).join('/') || '.', { recursive: true });
 fs.writeFileSync(STATE, JSON.stringify(state));

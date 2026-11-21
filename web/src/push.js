@@ -7,11 +7,21 @@ import { get, cardOwed, dailyLimit, monthStats, onSaved, set } from './store.js'
 import { thisYm } from './util.js';
 import { VAPID_PUBLIC, CFG_PUBLIC, TOPIC } from './keys.js';
 import { live } from './gold.js';
+import { STYLES } from './advisor.js';
 
 export const isNative = () => !!window.CPNative;
 export const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 export const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+// weekly summary inputs (percentages and labels only, no amounts)
+function weekly(s) {
+  const h = s.nwHist || []; const now = h.at(-1); const wk = h.filter((x) => x.d <= new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)).at(-1);
+  const calls = (s.calls || []).filter((c) => Date.now() - c.t < 7 * 864e5 && c.v !== 'hold');
+  const last = {}; for (const c of calls) last[c.sym] = c;
+  const nm = (sym) => ((s.markets.list || []).find((x) => x.sym === sym) || {}).name || sym;
+  return { nwPct: now && wk && wk.v ? Math.round(((now.v - wk.v) / Math.abs(wk.v)) * 1000) / 10 : null, calls: Object.values(last).slice(0, 5).map((c) => `${nm(c.sym)} ${c.v.replace('sbuy', 'strong buy').replace('ssell', 'strong sell')}`) };
+}
 
 function config() {
   const s = get();
@@ -20,7 +30,14 @@ function config() {
     v: 1,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Warsaw',
     gold: { on: !!s.gold.alertsOn, below: s.gold.below || null, dropPct: s.gold.dropPct || null, news: !!s.gold.newsOn, signals: s.gold.signalsOn !== false },
-    markets: { on: s.markets.alertsOn !== false, alerts: Object.entries(s.markets.alerts || {}).slice(0, 30).map(([sym, a]) => ({ sym, name: ((s.markets.list || []).find((x) => x.sym === sym) || {}).name || sym, above: a.above || null, below: a.below || null })) },
+    // v2 alerts (several per asset). v1 fields kept empty so older job versions stay quiet.
+    markets: { on: s.markets.alertsOn !== false, alerts: [] },
+    alerts: s.markets.alertsOn === false ? [] : (s.alerts || []).filter((a) => a.on).slice(0, 60).map(({ id, sym, name, kind, a, b, pct, days, dir, once, urgent, last }) => ({ id, sym, name, kind, a, b, pct, days, dir, once, urgent, last })),
+    quiet: s.settings.quiet || null,
+    style: (({ buy, sell }) => ({ buy, sell }))(STYLES[s.settings.risk] || STYLES.balanced),
+    sunday: s.settings.sunday !== false ? weekly(s) : null,
+    dca: s.dca && s.dca.on ? { day: s.dca.day || 10, amount: s.dca.amount || 0, sym: s.dca.sym || null } : null,
+    backup: s.settings.backupRemind !== false ? { last: typeof s.settings.lastBackup === 'number' ? s.settings.lastBackup : Date.parse(s.settings.lastBackup || '') || 0 } : null,
     remind9pm: !!s.settings.remind9pm,
     card: { on: !!(s.card.on && s.settings.cardRemind), name: s.card.name, dueDay: s.card.dueDay || 0, owed: Math.round(cardOwed(s) * 100) / 100 },
     lastEntry: s.txns.length ? s.txns.reduce((m, t) => (t.date > m ? t.date : m), '') : null,
