@@ -140,16 +140,29 @@ export function LineChart({ pts, color = '#00D2FF', height = 200, fmt = (v) => n
 
 export const PALETTE = ['#00D2FF', '#FFE36E', '#7A5CFF', '#FF3CC8', '#3CFFB4', '#9DF6FF', '#FF8F5C', '#A794FF', '#5CF2FF', '#C9CBE0'];
 
-export function Donut({ data, size = 150, center }) {
+export function Donut({ data, size = 150, center, sel = -1, onPick }) {
   const total = data.reduce((s, d) => s + d.v, 0);
   if (!total) return null;
   const R = 56, C = 2 * Math.PI * R;
   let off = 0;
-  return html`<svg viewBox="0 0 150 150" width=${size} height=${size} style="flex:none">
+  // tap anywhere on the ring: work out which slice from the angle; tap the middle to clear
+  const tap = onPick && ((e) => {
+    const b = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - b.left) / b.width * 150 - 75, y = (e.clientY - b.top) / b.height * 150 - 75;
+    const r = Math.hypot(x, y);
+    if (r < 38) { onPick(-1); return; }
+    if (r > 78) return;
+    let a = Math.atan2(x, -y); if (a < 0) a += 2 * Math.PI;
+    let acc = 0, want = (a / (2 * Math.PI)) * total;
+    for (let i = 0; i < data.length; i++) { acc += data[i].v; if (want <= acc) { onPick(i === sel ? -1 : i); return; } }
+  });
+  return html`<svg viewBox="0 0 150 150" width=${size} height=${size} style=${{ flex: 'none', cursor: onPick ? 'pointer' : '' }} onClick=${tap}>
     <circle cx="75" cy="75" r=${R} fill="none" stroke="rgba(128,128,128,.15)" stroke-width="16"/>
     ${data.map((d, i) => {
       const len = (d.v / total) * C;
-      const el = html`<circle cx="75" cy="75" r=${R} fill="none" stroke=${d.color || PALETTE[i % PALETTE.length]} stroke-width="16"
+      const on = sel === i, dim = sel >= 0 && !on;
+      const el = html`<circle cx="75" cy="75" r=${R} fill="none" stroke=${d.color || PALETTE[i % PALETTE.length]} stroke-width=${on ? 24 : 16}
+        opacity=${dim ? 0.28 : 1} style="transition:stroke-width .2s,opacity .2s"
         stroke-dasharray=${`${Math.max(0, len - 2)} ${C}`} stroke-dashoffset=${-off} transform="rotate(-90 75 75)"/>`;
       off += len; return el;
     })}

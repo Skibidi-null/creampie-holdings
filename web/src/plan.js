@@ -2,19 +2,53 @@ import { useState } from 'preact/hooks';
 import { html, Money, Back, Sheet, Field, NumInput, Switch, Bar, Donut, Bars, Empty, toast, valid, PALETTE, SettingRow } from './ui.js';
 import { useStore, patch, set, monthStats, catOf, upsert, removeFrom, upcomingBills, initialLast, curOf, CARD, txnPln, dailyLimit } from './store.js';
 import { T } from './copy.js';
+import { TxnRow } from './activity.js';
 import { thisYm, prevYm, nextYm, monthName, money, num, parseNum, niceDate, daysBetween, today, daysInMonth, ymOf, pct } from './util.js';
 
 const back = () => history.back();
 
 export function CategoryBreakdown({ s, ms, max = 8 }) {
+  const [sel, setSel] = useState(-1);
+  const [all, setAll] = useState(false);
   const rows = Object.entries(ms.byCat).sort((a, b) => b[1] - a[1]);
   if (!rows.length) return html`<${Empty} text=${T.empty} />`;
   const data = rows.slice(0, max).map(([id, v], i) => ({ id, v, color: PALETTE[i % PALETTE.length] }));
+  const restIds = rows.slice(max).map((r) => r[0]);
   const rest = rows.slice(max).reduce((a, r) => a + r[1], 0);
   if (rest) data.push({ id: 'rest', v: rest, color: '#555' });
-  return html`<div class="row" style="gap:14px;align-items:center">
-    <${Donut} data=${data} size=${130} center=${['SPENT', s.settings.privacy ? '••••' : num(ms.spend, 0)]} />
-    <div class="legend grow">${data.map((d) => html`<div class="li"><i class="sw" style=${{ background: d.color }}></i><span class="grow" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.id === 'rest' ? 'Other' : `${catOf(s, d.id).icon} ${catOf(s, d.id).name}`}</span><span class="mono dim" style="font-size:12px">${Math.round((d.v / ms.spend) * 100)}%</span></div>`)}</div>
+  const d = sel >= 0 ? data[sel] : null;
+  const pick = (i) => { setSel(i === sel ? -1 : i); setAll(false); };
+  const label = (id) => (id === 'rest' ? 'Other' : `${catOf(s, id).icon} ${catOf(s, id).name}`);
+  const short = (id) => { const n = id === 'rest' ? 'Other' : catOf(s, id).name; return (n.length > 13 ? n.slice(0, 12) + '…' : n).toUpperCase(); };
+  const center = d ? [short(d.id), s.settings.privacy ? '••••' : num(d.v, 0)] : ['SPENT', s.settings.privacy ? '••••' : num(ms.spend, 0)];
+  return html`<div>
+    <div class="row" style="gap:14px;align-items:center">
+      <${Donut} data=${data} size=${130} center=${center} sel=${sel} onPick=${pick} />
+      <div class="legend grow">${data.map((x, i) => html`<div class="li" style=${{ cursor: 'pointer', opacity: sel >= 0 && sel !== i ? 0.45 : 1, fontWeight: sel === i ? 700 : '' }} onClick=${() => pick(i)}><i class="sw" style=${{ background: x.color }}></i><span class="grow" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label(x.id)}</span><span class="mono dim" style="font-size:12px">${Math.round((x.v / ms.spend) * 100)}%</span></div>`)}</div>
+    </div>
+    ${!d && html`<div class="hint" style="margin-top:8px;text-align:center">Tap a colour to see what is in it</div>`}
+    ${d && html`<${CatDetail} s=${s} ms=${ms} d=${d} ids=${d.id === 'rest' ? restIds : [d.id]} title=${label(d.id)} all=${all} setAll=${setAll} onClose=${() => setSel(-1)} />`}
+  </div>`;
+}
+
+function CatDetail({ s, ms, d, ids, title, all, setAll, onClose }) {
+  const ym = ms.ym;
+  const txns = s.txns.filter((t) => t.t === 'exp' && ymOf(t.date) === ym && ids.includes(t.cat)).sort((a, b) => txnPln(s, b) - txnPln(s, a));
+  const prev = monthStats(s, prevYm(ym));
+  const before = ids.reduce((a, id) => a + (prev.byCat[id] || 0), 0);
+  const diff = d.v - before;
+  const shown = all ? txns : txns.slice(0, 6);
+  return html`<div style=${{ marginTop: '12px', borderTop: `2px solid ${d.color}`, paddingTop: '10px' }}>
+    <div class="row between" style="margin-bottom:8px"><b>${title}</b><button class="more" style="background:none;border:0;padding:4px 0" onClick=${onClose}>Close</button></div>
+    <div class="kv">
+      <span>Spent in ${monthName(ym)}</span><${Money} v=${d.v} />
+      <span>Share of spending</span><span>${Math.round((d.v / ms.spend) * 100)}%</span>
+      <span>Payments</span><span>${txns.length}</span>
+      ${txns.length > 0 && html`<span>Average payment</span><${Money} v=${d.v / txns.length} />`}
+      <span>vs ${monthName(prevYm(ym))}</span><span class=${`mono ${before ? (diff > 0 ? 'down' : 'up') : ''}`}>${before ? html`${diff > 0 ? '▲' : '▼'} <${Money} v=${Math.abs(diff)} d=${0} /> (${pct((diff / before) * 100, 0)})` : 'nothing last month'}</span>
+    </div>
+    <div style="margin-top:8px">${shown.map((t) => html`<${TxnRow} t=${t} s=${s} key=${t.id} />`)}</div>
+    ${txns.length > 6 && html`<button class="btn" style="width:100%;margin-top:6px" onClick=${() => setAll(!all)}>${all ? 'Show less' : `Show all ${txns.length}`}</button>`}
   </div>`;
 }
 
